@@ -189,15 +189,10 @@ local function openSpin(state, row)
 end
 
 local function cycleAlignment(state)
+    -- false is the cycle's stand-in for "book default", turned back into nil on
+    -- the way into the style table.
     local current = state.plugin:getValue("text_align") or false
-    local index = 1
-    for i, value in ipairs(ALIGN_CYCLE) do
-        if value == current then
-            index = i
-            break
-        end
-    end
-    local next_value = ALIGN_CYCLE[(index % #ALIGN_CYCLE) + 1]
+    local next_value = Settings.nextInCycle(ALIGN_CYCLE, current)
     state.plugin:setValue("text_align", next_value or nil, false)
     setButtonText(state, "align", state.alignText())
     repaint(state)
@@ -210,17 +205,9 @@ local function cycleScope(state)
     if plugin.language then
         table.insert(scopes, 2, Settings.SCOPE_LANGUAGE)
     end
-    local current = plugin:getScope()
-    local index = 1
-    for i, scope in ipairs(scopes) do
-        if scope == current then
-            index = i
-            break
-        end
-    end
-    local next_scope = scopes[(index % #scopes) + 1]
-    -- Widening the scope discards the narrower table; the reader is told which
-    -- style is in charge now by the button label, and can cycle straight back.
+    local next_scope = Settings.nextInCycle(scopes, plugin:getScope())
+    -- Cycling is lossless: each level keeps its own style, so a full turn of this
+    -- button comes back to exactly where it started.
     plugin:setScope(next_scope)
     setButtonText(state, "scope", state.scopeText())
     for _index, row in ipairs(ROWS) do

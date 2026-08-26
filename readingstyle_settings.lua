@@ -32,6 +32,8 @@ Settings.CSS_SCHEMA = {
     para_spacing          = { kind = "number", min = 0,    max = 4,   step = 0.1,  precision = "%.1f", unit = "em", default = 0.5 },
     first_para_no_indent  = { kind = "bool" },
     first_para_no_spacing = { kind = "bool" },
+    avoid_widows_orphans  = { kind = "bool" },
+    quote_style           = { kind = "enum", values = { "indented", "indented_italic", "plain" }, default = "indented" },
     -- Chapters
     chapter_space_before  = { kind = "number", min = 0,    max = 10,  step = 0.5,  precision = "%.1f", unit = "em", default = 2 },
     chapter_space_after   = { kind = "number", min = 0,    max = 6,   step = 0.1,  precision = "%.1f", unit = "em", default = 1 },
@@ -40,25 +42,64 @@ Settings.CSS_SCHEMA = {
     chapter_bold          = { kind = "bool" },
     chapter_italic        = { kind = "bool" },
     chapter_uppercase     = { kind = "bool" },
+    chapter_small_caps    = { kind = "bool" },
+    chapter_rule          = { kind = "bool" },
+    -- Which heading levels count as a chapter. Unset keeps the historical
+    -- behaviour (all three), so an existing style keeps looking the same.
+    chapter_levels        = { kind = "enum", values = { "h1", "h1h2", "h1h2h3" }, default = "h1h2" },
+    chapter_page_break    = { kind = "enum", values = { "h1", "h1h2" }, default = "h1" },
     -- Text
     text_align            = { kind = "enum", values = { "left", "justify", "right" }, default = "justify" },
     letter_spacing        = { kind = "number", min = -0.1, max = 0.5, step = 0.01, precision = "%.2f", unit = "em", default = 0.05 },
+    emphasis_style        = { kind = "enum", values = { "bold", "underline" }, default = "bold" },
+    sub_sup_smaller       = { kind = "bool" },
+    -- Ink: what the page is made of, rather than how it is laid out
+    force_black_text      = { kind = "bool" },
+    no_background         = { kind = "bool" },
+    link_black            = { kind = "bool" },
+    link_no_underline     = { kind = "bool" },
     -- Images
     image_width           = { kind = "enum", values = { "original", "page", "text" }, default = "text" },
     image_align           = { kind = "enum", values = { "left", "center", "right" }, default = "center" },
     image_no_overflow     = { kind = "bool" },
+    hide_images           = { kind = "bool" },
     -- Advanced
+    pre_wrap              = { kind = "bool" },
     custom_css            = { kind = "string" },
 }
 
 --- Ordered for deterministic iteration (menus, presets, CSS, tests).
 Settings.CSS_KEYS = {
     "para_indent", "para_spacing", "first_para_no_indent", "first_para_no_spacing",
-    "chapter_space_before", "chapter_space_after", "chapter_font_size",
-    "chapter_align", "chapter_bold", "chapter_italic", "chapter_uppercase",
-    "text_align", "letter_spacing",
-    "image_width", "image_align", "image_no_overflow",
-    "custom_css",
+    "avoid_widows_orphans", "quote_style",
+    "chapter_levels", "chapter_space_before", "chapter_space_after",
+    "chapter_font_size", "chapter_align", "chapter_bold", "chapter_italic",
+    "chapter_uppercase", "chapter_small_caps", "chapter_rule", "chapter_page_break",
+    "text_align", "letter_spacing", "emphasis_style", "sub_sup_smaller",
+    "force_black_text", "no_background", "link_black", "link_no_underline",
+    "image_width", "image_align", "image_no_overflow", "hide_images",
+    "pre_wrap", "custom_css",
+}
+
+--- Keys grouped by the menu section that shows them, so a section can be marked
+-- as changed and reset without repeating the list in the menu file.
+Settings.PARAGRAPH_KEYS = {
+    "para_indent", "para_spacing", "first_para_no_indent", "first_para_no_spacing",
+    "avoid_widows_orphans", "quote_style",
+}
+Settings.CHAPTER_KEYS = {
+    "chapter_levels", "chapter_space_before", "chapter_space_after",
+    "chapter_font_size", "chapter_align", "chapter_bold", "chapter_italic",
+    "chapter_uppercase", "chapter_small_caps", "chapter_rule", "chapter_page_break",
+}
+Settings.TEXT_KEYS = {
+    "text_align", "letter_spacing", "emphasis_style", "sub_sup_smaller",
+}
+Settings.INK_KEYS = {
+    "force_black_text", "no_background", "link_black", "link_no_underline",
+}
+Settings.IMAGE_KEYS = {
+    "image_width", "image_align", "image_no_overflow", "hide_images",
 }
 
 --- Settings that belong to KOReader, driven through events.
@@ -70,6 +111,9 @@ Settings.CSS_KEYS = {
 -- default_key:  G_defaults key with the built-in default, used when the reader
 --               has never saved one. Both mirror what creoptions.lua marks with
 --               a star, so "at default" here means the same as it does there.
+-- default_value: literal fallback for the few settings creoptions declares a
+--               default for inline, without a G_defaults entry.
+-- precision:    format string, for the settings that are not whole numbers.
 -- Ranges mirror frontend/ui/data/creoptions.lua, so the plugin cannot ask the
 -- engine for a value KOReader's own config dialog would refuse.
 Settings.ENGINE_SCHEMA = {
@@ -77,6 +121,12 @@ Settings.ENGINE_SCHEMA = {
                        global_key = "copt_line_spacing",   default_key = "DCREREADER_CONFIG_LINE_SPACE_PERCENT_MEDIUM" },
     word_expansion = { configurable = "word_expansion", event = "SetWordExpansion",    min = 0,  max = 20,  step = 1, hold_step = 4, unit = "%",
                        global_key = "copt_word_expansion", default_key = "DCREREADER_CONFIG_WORD_EXPANSION_NONE" },
+    -- Ranges from creoptions.lua's "more options" panel. Contrast (font_gamma)
+    -- is deliberately left out: KOReader stores it as an index into a gamma
+    -- table rather than a value, which this min/max model cannot express.
+    font_base_weight = { configurable = "font_base_weight", event = "SetFontBaseWeight",
+                       min = -3, max = 5.5, step = 0.25, hold_step = 1, precision = "%+.2f",
+                       global_key = "copt_font_base_weight", default_value = 0 },
     t_page_margin  = { configurable = "t_page_margin",  event = "SetPageTopMargin",    min = 0,  max = 60,  step = 1, hold_step = 5,
                        global_key = "copt_t_page_margin",  default_key = "DCREREADER_CONFIG_T_MARGIN_SIZES_LARGE" },
     b_page_margin  = { configurable = "b_page_margin",  event = "SetPageBottomMargin", min = 0,  max = 60,  step = 1, hold_step = 5,
@@ -97,11 +147,13 @@ Settings.ENGINE_SCHEMA = {
 
 --- Engine settings grouped by the menu section that shows them, so a section
 -- can be marked as changed without hard-coding the list in two places.
-Settings.TEXT_ENGINE_KEYS = { "line_spacing", "word_spacing", "word_expansion" }
+Settings.TEXT_ENGINE_KEYS = {
+    "line_spacing", "word_spacing", "word_expansion", "font_base_weight",
+}
 Settings.LAYOUT_ENGINE_KEYS = { "h_page_margins", "t_page_margin", "b_page_margin" }
 
 Settings.ENGINE_KEYS = {
-    "line_spacing", "word_spacing", "word_expansion",
+    "line_spacing", "word_spacing", "word_expansion", "font_base_weight",
     "h_page_margins", "t_page_margin", "b_page_margin",
 }
 
@@ -134,6 +186,11 @@ local function isValidEnum(spec, value)
     return false
 end
 
+--- Hand-written CSS goes into doc_settings and G_reader_settings, which are
+-- rewritten in full on every save. A runaway paste should not turn a settings
+-- file into megabytes.
+Settings.MAX_CUSTOM_CSS = 64 * 1024
+
 --- Is this a value the schema accepts for this key?
 function Settings.isValid(key, value)
     local spec = Settings.CSS_SCHEMA[key]
@@ -141,7 +198,9 @@ function Settings.isValid(key, value)
     if spec.kind == "number" then return isValidNumber(spec, value) end
     if spec.kind == "bool"   then return type(value) == "boolean" end
     if spec.kind == "enum"   then return isValidEnum(spec, value) end
-    if spec.kind == "string" then return type(value) == "string" and value ~= "" end
+    if spec.kind == "string" then
+        return type(value) == "string" and value ~= "" and #value <= Settings.MAX_CUSTOM_CSS
+    end
     return false
 end
 
@@ -229,6 +288,80 @@ function Settings.sanitize(style)
         end
     end
     return style
+end
+
+--- What a plain on/off setting becomes when it is tapped: on, or back to unset.
+-- These live here, as plain functions over a value, because expressing them
+-- inline is where this went wrong once already: `enabled and nil or true` looks
+-- like a conditional and is not one — nil is falsy, so the `or` always fires and
+-- the setting could never be switched off again. Pure, and tested below.
+function Settings.nextToggle(current)
+    if current == true then return nil end
+    return true
+end
+
+--- What a three-state setting becomes when it is tapped:
+--- book default -> on -> off -> book default.
+function Settings.nextTristate(current)
+    if current == nil then return true end
+    if current == true then return false end
+    return nil
+end
+
+--- The value after `current` in a cycle, wrapping at the end.
+-- `false` is allowed as a member and stands for "unset"; callers turn it back
+-- into nil. Returns the first entry when `current` is not in the list.
+function Settings.nextInCycle(cycle, current)
+    for index, value in ipairs(cycle) do
+        if value == current then
+            return cycle[(index % #cycle) + 1]
+        end
+    end
+    return cycle[1]
+end
+
+local function clampRange(range, value)
+    if type(value) ~= "number" or value ~= value then return nil end
+    return math.max(range.min, math.min(range.max, value))
+end
+
+--- Clamps a KOReader-owned value into the range its schema allows.
+-- Returns nil when the value cannot be used at all, so the caller can skip the
+-- key and warn instead of handing the engine something KOReader's own config
+-- dialog would refuse. Presets travel between versions and devices and can be
+-- hand-edited, so this is the gate every engine value passes through.
+function Settings.clampEngine(key, value)
+    local spec = Settings.ENGINE_SCHEMA[key]
+    if not spec then return nil end
+    if spec.pair then
+        if type(value) ~= "table" then return nil end
+        local left = clampRange(spec.left, value[1])
+        local right = clampRange(spec.right, value[2])
+        if left == nil or right == nil then return nil end
+        return { left, right }
+    end
+    return clampRange(spec, value)
+end
+
+--- Sanitizes the whole per-language profile table, keys included.
+-- A corrupted or hand-edited settings file can hold anything as a key; an entry
+-- filed under a number or a stray boolean would never be reachable but would be
+-- written back out forever.
+function Settings.sanitizeLanguages(languages)
+    if type(languages) ~= "table" then return {} end
+    local drop = {}
+    for code, style in pairs(languages) do
+        if type(code) ~= "string" or Settings.languageKey(code) ~= code
+                or type(style) ~= "table" then
+            drop[#drop + 1] = code
+        else
+            Settings.sanitize(style)
+        end
+    end
+    for _index, code in ipairs(drop) do
+        languages[code] = nil
+    end
+    return languages
 end
 
 --- Normalizes a book language ("tr-TR", "TR") into a profile key ("tr").

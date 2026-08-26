@@ -44,6 +44,41 @@ local IMAGE_WIDTH_LABELS = {
     text = _("Fit to text width"),
 }
 
+local QUOTE_LABELS = {
+    indented = _("Indented"),
+    indented_italic = _("Indented and italic"),
+    plain = _("No special treatment"),
+}
+
+local LEVEL_LABELS = {
+    h1 = _("H1 only"),
+    h1h2 = _("H1 and H2"),
+    h1h2h3 = _("H1, H2 and H3"),
+}
+
+local PAGE_BREAK_LABELS = {
+    h1 = _("On H1"),
+    h1h2 = _("On H1 and H2"),
+}
+
+local EMPHASIS_LABELS = {
+    bold = _("Bold instead of italic"),
+    underline = _("Underlined instead of italic"),
+}
+
+--- Which label table belongs to which enum key. One registry beats threading a
+-- labels argument through every formatting helper.
+local VALUE_LABELS = {
+    text_align = ALIGN_LABELS,
+    chapter_align = ALIGN_LABELS,
+    image_align = ALIGN_LABELS,
+    image_width = IMAGE_WIDTH_LABELS,
+    quote_style = QUOTE_LABELS,
+    chapter_levels = LEVEL_LABELS,
+    chapter_page_break = PAGE_BREAK_LABELS,
+    emphasis_style = EMPHASIS_LABELS,
+}
+
 local TRISTATE_LABELS = {
     [true] = _("on"),
     [false] = _("off"),
@@ -66,7 +101,8 @@ local function formatValue(key, value)
     if spec.kind == "number" then return formatNumber(spec, value) end
     if spec.kind == "bool" then return TRISTATE_LABELS[value] end
     if spec.kind == "enum" then
-        return (ALIGN_LABELS[value] or IMAGE_WIDTH_LABELS[value] or value)
+        local labels = VALUE_LABELS[key]
+        return (labels and labels[value]) or value
     end
     return tostring(value)
 end
@@ -145,8 +181,9 @@ local function numberItem(plugin, key, title, help)
 end
 
 --- Enum style setting: a radio submenu with "book default" at the top.
-local function enumSubMenu(plugin, key, title, labels, help)
+local function enumSubMenu(plugin, key, title, help)
     local spec = Settings.CSS_SCHEMA[key]
+    local labels = VALUE_LABELS[key] or {}
     local items = {
         {
             text = _("Book default"),
@@ -182,26 +219,20 @@ local function tristateItem(plugin, key, title, help)
         help_text = help,
         keep_menu_open = true,
         callback = function(touchmenu_instance)
-            local current = plugin:getValue(key)
-            local next_value
-            if current == nil then
-                next_value = true
-            elseif current == true then
-                next_value = false
-            end
-            plugin:setValue(key, next_value, true)
+            plugin:cycleTristate(key)
             if touchmenu_instance then touchmenu_instance:updateItems() end
         end,
     }
 end
 
 --- Plain on/off style setting, where "off" and "unset" mean the same thing.
-local function toggleItem(plugin, key, title, help)
+local function toggleItem(plugin, key, title, help, separator)
     return {
         -- The checkbox already says on or off; the marker is what makes the
         -- parent sections consistent with the rows underneath them.
         text_func = function() return marked(plugin, { key }, title) end,
         help_text = help,
+        separator = separator,
         checked_func = function() return plugin:getValue(key) == true end,
         callback = function() plugin:toggleValue(key) end,
     }
@@ -213,7 +244,11 @@ local function engineNumberItem(plugin, key, title, help)
     return {
         text_func = function()
             local value = plugin:getEngineValue(key)
-            local text = value and tostring(math.floor(value)) or "?"
+            local text = "?"
+            if value then
+                text = spec.precision and spec.precision:format(value)
+                    or tostring(math.floor(value))
+            end
             if value and spec.unit then
                 text = text .. "\u{202F}" .. spec.unit
             end
@@ -230,7 +265,12 @@ local function engineNumberItem(plugin, key, title, help)
                 value_max = spec.max,
                 value_step = spec.step,
                 value_hold_step = spec.hold_step or spec.step,
+                precision = spec.precision,
                 unit = spec.unit,
+                -- Gives the widget its "Default value: N" button. The default is
+                -- KOReader's own — the reader's saved one if they have set one —
+                -- so this row resets to the same place the config bar would.
+                default_value = plugin:getEngineDefault(key),
                 callback = function(spin)
                     plugin:setEngineValue(key, spin.value)
                     if touchmenu_instance then touchmenu_instance:updateItems() end
@@ -256,6 +296,11 @@ local function enginePairItem(plugin, key, title, left_text, right_text, help)
         keep_menu_open = true,
         callback = function(touchmenu_instance)
             local value = plugin:getEngineValue(key) or { spec.left.min, spec.right.min }
+            -- Both halves are needed for the widget to offer its default button.
+            local default_value = plugin:getEngineDefault(key)
+            if type(default_value) ~= "table" then
+                default_value = nil
+            end
             UIManager:show(DoubleSpinWidget:new{
                 title_text = title,
                 info_text = help,
@@ -272,6 +317,8 @@ local function enginePairItem(plugin, key, title, left_text, right_text, help)
                 right_step = spec.right.step,
                 right_hold_step = spec.right.hold_step,
                 unit = spec.unit,
+                left_default = default_value and default_value[1] or nil,
+                right_default = default_value and default_value[2] or nil,
                 callback = function(left, right)
                     plugin:setEngineValue(key, { left, right })
                     if touchmenu_instance then touchmenu_instance:updateItems() end
@@ -281,19 +328,25 @@ local function enginePairItem(plugin, key, title, left_text, right_text, help)
     }
 end
 
-local function resetItem(plugin, keys, title, question)
+--- Resets a section. engine_keys are KOReader's own settings shown in that
+-- section: they are reset alongside, so pressing this always clears the section's
+-- changed-marker rather than leaving part of it behind.
+local function resetItem(plugin, keys, engine_keys, title, question)
     return {
         text = title,
         keep_menu_open = true,
         enabled_func = function()
             local style = plugin:getStyle()
-            for _index, key in ipairs(keys) do
+            for _index, key in ipairs(keys or {}) do
                 if style[key] ~= nil then return true end
+            end
+            for _index, key in ipairs(engine_keys or {}) do
+                if not plugin:isEngineDefault(key) then return true end
             end
             return false
         end,
         callback = function(touchmenu_instance)
-            plugin:confirmReset(keys, question, touchmenu_instance)
+            plugin:confirmReset(keys, engine_keys, question, touchmenu_instance)
         end,
     }
 end
@@ -301,7 +354,7 @@ end
 -- Sections ------------------------------------------------------------------
 
 local FIRST_PARA_KEYS = { "first_para_no_indent", "first_para_no_spacing" }
-local PARAGRAPH_KEYS = { "para_indent", "para_spacing", "first_para_no_indent", "first_para_no_spacing" }
+local PARAGRAPH_KEYS = Settings.PARAGRAPH_KEYS
 
 local function paragraphsMenu(plugin)
     return {
@@ -323,18 +376,22 @@ local function paragraphsMenu(plugin)
                         _("Remove the paragraph spacing above the first paragraph after a heading, so it sits directly under the chapter title.")),
                 },
             },
-            resetItem(plugin, PARAGRAPH_KEYS, _("Reset paragraph settings"),
+            toggleItem(plugin, "avoid_widows_orphans", _("Avoid widows and orphans"),
+                _("Stop a paragraph from leaving a single line stranded at the top or bottom of a page.\n\nPages end less evenly as a result, and the page count shifts.")),
+            enumSubMenu(plugin, "quote_style", _("Block quotes"),
+                _("How quoted passages are set apart from the body text. \"No special treatment\" clears the publisher's own indentation and italics instead of adding to them.")),
+            resetItem(plugin, PARAGRAPH_KEYS, nil, _("Reset paragraph settings"),
                 _("Reset the paragraph settings to the publisher's defaults?")),
         },
     }
 end
 
-local CHAPTER_KEYS = {
-    "chapter_space_before", "chapter_space_after", "chapter_font_size",
-    "chapter_align", "chapter_bold", "chapter_italic", "chapter_uppercase",
-}
+local CHAPTER_KEYS = Settings.CHAPTER_KEYS
 
-local CHAPTER_STYLE_KEYS = { "chapter_bold", "chapter_italic", "chapter_uppercase" }
+local CHAPTER_STYLE_KEYS = {
+    "chapter_bold", "chapter_italic", "chapter_uppercase",
+    "chapter_small_caps", "chapter_rule",
+}
 
 local CHAPTER_HELP = _("Applies to h1, h2 and h3 headings.\n\nBooks that do not mark their chapter titles as real headings — a styled paragraph inside a container, say — cannot be reached by any of these settings.")
 
@@ -342,14 +399,18 @@ local function chaptersMenu(plugin)
     return {
         text_func = function() return marked(plugin, CHAPTER_KEYS, _("Chapters")) end,
         sub_item_table = {
+            enumSubMenu(plugin, "chapter_levels", _("What counts as a chapter"),
+                _("Which heading levels the settings below apply to.\n\nMost books mark chapters as H1, many use H2, and a few use H3. Including H3 in a book full of sub-headings will space out things that are not chapters at all.\n\nAlignment is deliberately left out of this: it always applies to every heading level.")),
             numberItem(plugin, "chapter_space_before", _("Space before chapter title"),
                 _("Whitespace above chapter and section titles, so a chapter does not start flush against the top of the page.\n\n") .. CHAPTER_HELP),
             numberItem(plugin, "chapter_space_after", _("Space after chapter title"),
                 _("Whitespace between a chapter title and the text that follows it.\n\n") .. CHAPTER_HELP),
             numberItem(plugin, "chapter_font_size", _("Chapter title size"),
                 _("Size of chapter titles, as a percentage of the surrounding text.\n\n") .. CHAPTER_HELP),
-            enumSubMenu(plugin, "chapter_align", _("Chapter title alignment"), ALIGN_LABELS,
+            enumSubMenu(plugin, "chapter_align", _("Chapter title alignment"),
                 _("Alignment of headings. Applies to all six heading levels, so a centred chapter title does not sit above left-aligned sub-headings.")),
+            enumSubMenu(plugin, "chapter_page_break", _("Start chapters on a new page"),
+                _("Force a page break before each chapter title, the way a printed book does.\n\nChoosing H1 and H2 also keeps a subtitle from starting a second page of its own.")),
             {
                 text_func = function()
                     return marked(plugin, CHAPTER_STYLE_KEYS, _("Chapter title style"))
@@ -360,15 +421,19 @@ local function chaptersMenu(plugin)
                         _("Tap to cycle: book default, on, off.\n\n\"Off\" is not the same as \"book default\": it actively un-bolds titles the publisher made bold.")),
                     tristateItem(plugin, "chapter_italic", _("Italic")),
                     tristateItem(plugin, "chapter_uppercase", _("Uppercase")),
+                    tristateItem(plugin, "chapter_small_caps", _("Small capitals"),
+                        _("Needs a font that can produce small capitals, or the reader's font will synthesise them and the result can look uneven.")),
+                    toggleItem(plugin, "chapter_rule", _("Rule under the title"),
+                        _("A thin line under chapter titles, in the manner of an older printed book.")),
                 },
             },
-            resetItem(plugin, CHAPTER_KEYS, _("Reset chapter settings"),
+            resetItem(plugin, CHAPTER_KEYS, nil, _("Reset chapter settings"),
                 _("Reset the chapter title settings to the publisher's defaults?")),
         },
     }
 end
 
-local TEXT_KEYS = { "text_align", "letter_spacing" }
+local TEXT_KEYS = Settings.TEXT_KEYS
 
 local function textMenu(plugin)
     return {
@@ -378,16 +443,45 @@ local function textMenu(plugin)
         sub_item_table = {
             engineNumberItem(plugin, "line_spacing", _("Line spacing"),
                 _("Height of each line, as a percentage. This is KOReader's own line spacing setting, the same one the bottom menu changes.")),
-            enumSubMenu(plugin, "text_align", _("Text alignment"), ALIGN_LABELS,
+            enumSubMenu(plugin, "text_align", _("Text alignment"),
                 _("Alignment of body text, paragraphs and list items. Headings keep their own alignment setting.")),
             numberItem(plugin, "letter_spacing", _("Letter spacing"),
                 _("Extra space between individual letters. Small amounts can help legibility; anything above about 0.1 em starts to look stretched.")),
             enginePairItem(plugin, "word_spacing", _("Word spacing"), _("Scaling"), _("Reduction"),
                 _("Two numbers, and only the first one pushes words apart.\n\nScaling is the width of every space, as a percentage of the font's own space character. 100% is the font's natural width, and KOReader's default is 95% — slightly narrower. Go above 100% for wider gaps.\n\nReduction is how far justification may squeeze those spaces back to fit another word on the line. 100% forbids squeezing, so raise it as well or the wider gaps will not hold.")),
+            engineNumberItem(plugin, "font_base_weight", _("Font weight"),
+                _("Makes the text heavier or lighter than the font's own weight. A small increase is the most effective answer to a font that prints faintly on e-ink.\n\nThis is KOReader's own font weight setting.")),
             engineNumberItem(plugin, "word_expansion", _("Word expansion"),
                 _("On justified lines with very wide gaps, allow the extra space to be spread inside words as letter spacing instead. Set as a percentage of the font size.")),
-            resetItem(plugin, TEXT_KEYS, _("Reset text settings"),
-                _("Reset the text settings this plugin controls to the publisher's defaults?\n\nLine spacing and word spacing belong to KOReader and are left alone.")),
+            enumSubMenu(plugin, "emphasis_style", _("Emphasis"),
+                _("Replaces italics with something else. Worth it when a book's italic face is thin or hard to read on screen.")),
+            toggleItem(plugin, "sub_sup_smaller", _("Smaller sub- and superscript"),
+                _("Shrinks footnote markers and the like, and stops them from stretching the line they sit on.")),
+            resetItem(plugin, TEXT_KEYS, Settings.TEXT_ENGINE_KEYS, _("Reset text settings"),
+                _("Reset every text setting in this section, including KOReader's own line spacing, word spacing, word expansion and font weight?")),
+        },
+    }
+end
+
+local INK_KEYS = Settings.INK_KEYS
+
+--- Colour rather than layout. Publisher styling assumes a backlit screen: grey
+-- body text, tinted callout boxes and blue underlined links all cost contrast on
+-- e-ink, where there is little to spare.
+local function inkMenu(plugin)
+    return {
+        text_func = function() return marked(plugin, INK_KEYS, _("Ink and links")) end,
+        sub_item_table = {
+            toggleItem(plugin, "force_black_text", _("Force black text"),
+                _("Overrides every colour the publisher chose, including the greys used for asides and captions, which print faintly on e-ink.\n\nAlso blackens borders.")),
+            toggleItem(plugin, "no_background", _("Remove background colours"),
+                _("Clears tinted boxes and page backgrounds. On a greyscale screen these become flat grey blocks that make the text on them harder to read."),
+                true),
+            toggleItem(plugin, "link_black", _("Links in black"),
+                _("Footnote markers and cross-references are usually blue, which renders as a mid grey.")),
+            toggleItem(plugin, "link_no_underline", _("Links without underline")),
+            resetItem(plugin, INK_KEYS, nil, _("Reset ink settings"),
+                _("Reset the colour and link settings to the publisher's defaults?")),
         },
     }
 end
@@ -458,6 +552,8 @@ local function pageLayoutMenu(plugin)
             engineNumberItem(plugin, "t_page_margin", _("Top margin")),
             engineNumberItem(plugin, "b_page_margin", _("Bottom margin"),
                 _("Space below the text. The status bar, when shown at the bottom, takes its height from here.")),
+            resetItem(plugin, nil, Settings.LAYOUT_ENGINE_KEYS, _("Reset margins"),
+                _("Reset all four margins to their defaults?")),
         },
     }
 end
@@ -480,19 +576,21 @@ local function headersFootersMenu(plugin)
     }
 end
 
-local IMAGE_KEYS = { "image_width", "image_align", "image_no_overflow" }
+local IMAGE_KEYS = Settings.IMAGE_KEYS
 
 local function imagesMenu(plugin)
     return {
         text_func = function() return marked(plugin, IMAGE_KEYS, _("Images")) end,
         sub_item_table = {
-            enumSubMenu(plugin, "image_width", _("Image width"), IMAGE_WIDTH_LABELS,
+            enumSubMenu(plugin, "image_width", _("Image width"),
                 _("\"Fit to text width\" only shrinks images that are too wide. \"Fit to page width\" also enlarges smaller ones, which can stretch images that carry explicit pixel dimensions.")),
-            enumSubMenu(plugin, "image_align", _("Image alignment"), ALIGN_LABELS,
+            enumSubMenu(plugin, "image_align", _("Image alignment"),
                 _("Aligning images turns them into blocks, which pulls inline images — drop caps, small icons inside a line of text — out of their line. Leave at book default unless you need it.")),
             toggleItem(plugin, "image_no_overflow", _("Prevent images from overflowing the page"),
                 _("Caps every image at the width and height of the page, so oversized images no longer spill past the margins.")),
-            resetItem(plugin, IMAGE_KEYS, _("Reset image settings"),
+            toggleItem(plugin, "hide_images", _("Hide images"),
+                _("Removes every image from the page, for reading a heavily illustrated book as plain text.\n\nCaptions stay, since they are ordinary text.")),
+            resetItem(plugin, IMAGE_KEYS, nil, _("Reset image settings"),
                 _("Reset the image settings to the publisher's defaults?")),
         },
     }
@@ -548,6 +646,35 @@ local function advancedMenu(plugin)
                 callback = function(touchmenu_instance)
                     editCustomCss(plugin, touchmenu_instance)
                 end,
+            },
+            toggleItem(plugin, "pre_wrap", _("Wrap long code lines"),
+                _("Lets preformatted blocks — code listings, terminal output — wrap instead of running off the edge of the page.")),
+            {
+                text = _("View generated CSS"),
+                help_text = _("Exactly what this plugin is appending to your stylesheet right now. Worth pasting into a bug report."),
+                keep_menu_open = true,
+                callback = function()
+                    local css = plugin:getCss()
+                    UIManager:show(InfoMessage:new{
+                        text = css ~= "" and css
+                            or _("Nothing is being generated: every setting is at book default."),
+                        monospace_font = true,
+                    })
+                end,
+            },
+            {
+                text = _("Save as a style tweak"),
+                help_text = _("Writes the generated CSS into KOReader's own user style tweaks folder, where it works without this plugin. A way out that does not cost you your settings."),
+                enabled_func = function() return plugin:getCss() ~= "" end,
+                keep_menu_open = true,
+                callback = function()
+                    local path, err = plugin:exportAsStyleTweak()
+                    UIManager:show(InfoMessage:new{
+                        text = path and T(_("Saved to %1\n\nIt appears under Style tweaks, in User style tweaks, once KOReader is restarted."), path)
+                            or T(_("Could not write the file: %1"), tostring(err)),
+                    })
+                end,
+                separator = true,
             },
             {
                 text = _("Edit this book's own tweak"),
@@ -613,31 +740,76 @@ local function presetsMenu(plugin)
 end
 
 local function scopeMenu(plugin)
-    local function scopeItem(scope, text, help, enabled_func)
+    local function scopeItem(scope, text, help, enabled_func, separator)
         return {
             text = text,
             help_text = help,
             radio = true,
+            separator = separator,
             enabled_func = enabled_func,
             checked_func = function() return plugin:getScope() == scope end,
             callback = function(touchmenu_instance)
-                if plugin:getScope() == scope then return end
-                local function switch()
-                    plugin:setScope(scope)
+                -- Nothing is lost by switching: the level you leave keeps its
+                -- style, so no confirmation is owed here.
+                plugin:setScope(scope)
+                if touchmenu_instance then touchmenu_instance:updateItems() end
+            end,
+        }
+    end
+
+    --- "Make what I am looking at the default for this language / for all books."
+    -- Picking a scope only ever moves where you edit; this writes the current
+    -- style onto that level, overwriting whatever was there.
+    local function promoteItem(scope, text_func, help, separator)
+        return {
+            text_func = text_func,
+            help_text = help,
+            separator = separator,
+            keep_menu_open = true,
+            enabled_func = function()
+                return scope ~= Settings.SCOPE_LANGUAGE or plugin.language ~= nil
+            end,
+            callback = function(touchmenu_instance)
+                local function promote()
+                    plugin:promoteStyleTo(scope)
                     if touchmenu_instance then touchmenu_instance:updateItems() end
                 end
-                if plugin:scopeChangeLosesSettings(scope) then
+                if plugin:promotionOverwrites(scope) then
                     UIManager:show(ConfirmBox:new{
-                        text = _("The settings you made for the narrower scope will be discarded, and the broader style takes over.\n\nContinue?"),
-                        ok_text = _("Discard"),
-                        ok_callback = switch,
+                        text = _("This replaces the style already stored at that level with the settings you are looking at now.\n\nContinue?"),
+                        ok_text = _("Replace"),
+                        ok_callback = promote,
                     })
                 else
-                    switch()
+                    promote()
                 end
             end,
         }
     end
+
+    --- Deleting is the only way to lose a style, and it has to be asked for.
+    local function removeItem(scope, text_func)
+        return {
+            text_func = text_func,
+            help_text = _("Deletes the style stored at that level. Editing moves to the next level up, and its style takes over."),
+            keep_menu_open = true,
+            enabled_func = function() return plugin:hasStyleAt(scope) end,
+            callback = function(touchmenu_instance)
+                UIManager:show(ConfirmBox:new{
+                    text = _("Delete the style stored at that level?"),
+                    ok_text = _("Delete"),
+                    ok_callback = function()
+                        plugin:removeStyleAt(scope)
+                        if touchmenu_instance then touchmenu_instance:updateItems() end
+                    end,
+                })
+            end,
+        }
+    end
+
+    local language_name = plugin:getLanguageName(plugin.language)
+
+    local PROMOTE_HELP = _("Only the settings this plugin owns travel with a language: indentation, spacing, alignment, chapter titles, images, custom CSS.\n\nLine spacing, margins and word spacing belong to KOReader, which stores them per book and has no notion of a language, so they stay where they are.")
 
     local language = plugin.language
     return {
@@ -647,7 +819,7 @@ local function scopeMenu(plugin)
             if scope == Settings.SCOPE_BOOK then
                 label = _("This book")
             elseif scope == Settings.SCOPE_LANGUAGE then
-                label = T(_("Books in %1"), language or "?")
+                label = T(_("Books in %1"), language_name or "?")
             end
             return T(_("Apply to: %1"), label)
         end,
@@ -655,11 +827,31 @@ local function scopeMenu(plugin)
             scopeItem(Settings.SCOPE_GLOBAL, _("All books"),
                 _("The style you edit here is used for every book that has no style of its own.")),
             scopeItem(Settings.SCOPE_LANGUAGE,
-                language and T(_("Books in %1"), language) or _("Books in this language"),
-                _("A separate style for books in this language, useful when one language reads better with different paragraph conventions.\n\nUnavailable when the book does not declare a language."),
+                language_name and T(_("Books in %1"), language_name) or _("Books in this language"),
+                _("A separate style for books in this language, useful when one language reads better with different paragraph conventions.\n\nThe language comes from the book's own metadata. When a book declares none this is greyed out, but you can give it one yourself: Book information, hold the language field, and set it. Reopen the book afterwards."),
                 function() return language ~= nil end),
             scopeItem(Settings.SCOPE_BOOK, _("This book only"),
-                _("A style stored with this book alone. It overrides both of the above.")),
+                _("A style stored with this book alone.\n\nSwitching between these three only changes which one you are editing and which one this book uses. The others keep their settings."),
+                nil, true),
+            promoteItem(Settings.SCOPE_LANGUAGE,
+                function()
+                    if language_name then
+                        return T(_("Use these settings for all books in %1"), language_name)
+                    end
+                    return _("Use these settings for all books in this language")
+                end,
+                PROMOTE_HELP),
+            promoteItem(Settings.SCOPE_GLOBAL,
+                function() return _("Use these settings for all books") end,
+                PROMOTE_HELP,
+                true),
+            removeItem(Settings.SCOPE_BOOK, function() return _("Delete this book's style") end),
+            removeItem(Settings.SCOPE_LANGUAGE, function()
+                if language_name then
+                    return T(_("Delete the %1 style"), language_name)
+                end
+                return _("Delete the style for this language")
+            end),
         },
     }
 end
@@ -697,6 +889,7 @@ function Menu.build(plugin)
         items[#items + 1] = headers_footers
     end
 
+    items[#items + 1] = inkMenu(plugin)
     items[#items + 1] = imagesMenu(plugin)
     local advanced = advancedMenu(plugin)
     advanced.separator = true
@@ -720,10 +913,13 @@ function Menu.build(plugin)
         text = _("Reset all reading style settings"),
         keep_menu_open = true,
         separator = true,
-        enabled_func = function() return not Settings.isEmpty(plugin:getStyle()) end,
+        enabled_func = function()
+            return not Settings.isEmpty(plugin:getStyle())
+                or plugin:countChangedEngineValues() > 0
+        end,
         callback = function(touchmenu_instance)
-            plugin:confirmReset(nil,
-                _("This restores every reading style setting in the current scope to the publisher's defaults.\n\nKOReader's own settings — line spacing, margins, word spacing — are left alone."),
+            plugin:confirmReset(Settings.CSS_KEYS, Settings.ENGINE_KEYS,
+                _("Puts everything this menu marks as changed back to default, at the level you are editing: this plugin's settings return to book default, and KOReader's own — line spacing, word spacing, font weight, margins — return to theirs.\n\nStyles stored at the other levels are not touched; deleting those is a separate action."),
                 touchmenu_instance)
         end,
     }

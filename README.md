@@ -14,14 +14,15 @@ Found under **Style ▸ Reading style**, next to Style tweaks.
 
 | Section | Settings |
 | --- | --- |
-| Paragraphs | Indentation, space between paragraphs, first paragraph after a heading (no indent / no space above) |
-| Chapters | Space before and after the title, title size, alignment, bold / italic / uppercase |
-| Text | Line spacing, alignment, letter spacing, word spacing, word expansion |
+| Paragraphs | Indentation, space between paragraphs, first paragraph after a heading, widow and orphan control, block quote style |
+| Chapters | Which heading levels count as a chapter, space before and after the title, title size, alignment, bold / italic / uppercase / small capitals, a rule under the title, starting each chapter on a new page |
+| Text | Line spacing, alignment, letter spacing, word spacing, word expansion, font weight, emphasis style, smaller sub- and superscript |
 | Typography | KOReader's typography rules and hyphenation, borrowed whole |
 | Page layout | Margin presets, left/right margins, top and bottom margins |
 | Header and footer | KOReader's own status bar menu, borrowed whole |
-| Images | Width, alignment, overflow protection |
-| Advanced | Custom CSS, and a shortcut to this book's own style tweak |
+| Ink and links | Force black text, remove background colours, black links, links without underline |
+| Images | Width, alignment, overflow protection, hiding images entirely |
+| Advanced | Wrapping long code lines, custom CSS, viewing the generated CSS, exporting it as a style tweak, and a shortcut to this book's own style tweak |
 
 Plus presets, three scopes, and a quick style screen.
 
@@ -43,6 +44,11 @@ carries up to the section it lives in, so a changed setting can be found by
 scanning the menu instead of opening every submenu. The top entry needs no
 marker: it already names the current style rather than a default.
 
+Reset covers exactly what the marker covers: a section's reset clears both the
+plugin's own settings and the KOReader ones shown in that section, and **Reset
+all reading style settings** puts the whole level back to default, so the style
+name reads "Publisher default" afterwards rather than still counting something.
+
 KOReader's own settings — line spacing, word spacing, margins — are marked too,
 against the default KOReader itself would star: your saved default if you ever
 pressed "save as default", otherwise the built-in one. The marker there means
@@ -55,14 +61,30 @@ showing publisher defaults, wherever that setting happens to be stored.
 
 Under **Apply to**:
 
-- **All books** — the default style, used by every book with nothing more specific.
-- **Books in `<language>`** — a style for one book language. Only offered when
-  the book declares one.
-- **This book only** — stored with the book, overrides both.
+- **All books** — the style used by every book that has nothing more specific.
+- **Books in `<language>`** — a style for one book language, taken from the
+  book's own metadata. Only offered when the book declares a language.
+- **This book only** — stored with the book.
 
-Picking a narrower scope copies what you are looking at down into it, so nothing
-changes on screen. Picking a broader one drops the narrower style and asks first
-if that would lose settings.
+Which level a book reads from is recorded with the book, not inferred from which
+styles happen to exist. Switching between the three only changes which one you
+are editing and which one this book uses: **the levels you switch away from keep
+their styles**, so a full round trip comes back to exactly where it started. A
+level with nothing in it yet is seeded from what is on screen, so choosing a
+scope never changes the page by itself.
+
+Two things below the three choices do more than switch:
+
+- **Use these settings for all books in `<language>` / for all books** — copies
+  what you are looking at onto that level, overwriting what was there. This is
+  how you answer "make this the default for Turkish" when a Turkish style
+  already exists.
+- **Delete this book's style / Delete the `<language>` style** — the only way to
+  lose a style, and it asks first. Editing then moves to the next level up.
+
+Only the settings this plugin owns travel with a language. Line spacing, margins
+and word spacing belong to KOReader, which stores them per book and has no notion
+of a language.
 
 ## Presets
 
@@ -102,6 +124,15 @@ Some honest limits, all of them inherent rather than unfinished:
 - **No entry in the bottom config bar.** Those options come from
   `frontend/ui/data/creoptions.lua`, which is fixed when the reader starts and
   has no plugin hook. The main menu and a gesture are the ways in.
+- **No contrast setting.** KOReader stores font gamma as an index into a gamma
+  table rather than a value, which the engine-setting model here cannot express.
+  It stays in KOReader's own menu.
+- **Small capitals depend on the font.** A font without real small capitals will
+  have them synthesised, and the result can look uneven.
+
+If you want to see exactly what the plugin is doing to a book, **Advanced ▸ View
+generated CSS** prints it. **Save as a style tweak** writes it into KOReader's own
+user style tweaks folder, where it keeps working without the plugin.
 
 ## Files
 
@@ -132,7 +163,7 @@ that resolves each string against a bundled table first and falls back to the
 English source.
 
 Shipped: Turkish, German, French, Spanish, Brazilian Portuguese, Simplified
-Chinese. A regional locale falls back to its base language file, so `de_DE` finds
+Chinese — 194 strings each, checked by `validate.lua`. A regional locale falls back to its base language file, so `de_DE` finds
 `de.lua`.
 
 To add one, drop `l10n/<code>.lua` next to the others — the code matches
@@ -148,10 +179,22 @@ placeholders do not match the source.
 
 ## A note on timing
 
-The stylesheet hook is installed in `init()`, not in `onReadSettings()`, and that
-matters. Plugins are registered at `readerui.lua:464`; the `ReadSettings` event
+Two orderings in `readerui.lua` decide where this plugin's code has to live, and
+they pull in opposite directions.
+
+**The stylesheet hook goes in `init()`**, not in `onReadSettings()`. Plugins are registered at `readerui.lua:464`; the `ReadSettings` event
 that builds the first stylesheet is only sent at `:484`. Injecting CSS after that
 point changes the document's rendering hash, which starts `ReaderRolling`'s
 rerender-and-reload machinery: the book closes and reopens half a minute later,
 looking exactly like a crash. Getting in before the first render avoids it
 entirely.
+
+**The book's language cannot be read there.** `loadDocument()` is deferred into a
+postInitCallback (`readerui.lua:331-333`) that only runs at `:486` — after the
+plugins and after `ReadSettings`. At `init()` the crengine document exists but has
+not been parsed, so its metadata is empty and every book looks as though it
+declares no language. So `init()` uses the metadata KOReader cached on the
+previous open, and `onPreRenderDocument` — documented at `:338-340` as the place
+for settings that need the loaded document — asks the document itself. That is
+also the last moment the stylesheet can change for free, since `ReaderRolling`
+records the rendering hash in a later callback.
