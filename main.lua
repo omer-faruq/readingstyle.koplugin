@@ -47,6 +47,7 @@ local Builtin = require("readingstyle_presets")
 local Css = require("readingstyle_css")
 local Menu = require("readingstyle_menu")
 local Quick = require("readingstyle_quick")
+local Sandbox = require("readingstyle_sandbox")
 local Settings = require("readingstyle_settings")
 
 local SETTING_STYLE = "reading_style"
@@ -389,8 +390,17 @@ function ReadingStyle:cycleTristate(key)
 end
 
 --- Current value of a KOReader-owned setting (line spacing, margins, ...).
-function ReadingStyle:getEngineValue(key)
+--- The value the menus should show. Under a preview sandbox that is the value
+-- the reader has chosen there, which the book has not been told about yet;
+-- pass raw = true for what the document is actually rendering with (the
+-- preview needs both, to say "105% -> 120%").
+function ReadingStyle:getEngineValue(key, raw)
     local spec = Settings.ENGINE_SCHEMA[key]
+    if not spec then return nil end
+    if not raw and self.sandbox then
+        local value = self.sandbox:engineValue(key)
+        if value ~= nil then return value end
+    end
     local configurable = self.ui.document.configurable
     return configurable and configurable[spec.configurable]
 end
@@ -454,12 +464,22 @@ function ReadingStyle:setEngineValue(key, value)
         return false
     end
 
+    -- Counted by getStyleName, so the label has to be recomputed.
+    self.style_name = nil
+
+    if self.sandbox then
+        -- Under a preview, remember it instead of driving the document. This is
+        -- the single place a KOReader document setting is set from this plugin,
+        -- which is what makes a sandbox possible at all: nothing else has to
+        -- know, and cancelling has nothing to undo here because nothing was set.
+        self.sandbox:setEngine(key, value)
+        return true
+    end
+
     local configurable = self.ui.document.configurable
     if configurable then
         configurable[spec.configurable] = value
     end
-    -- Counted by getStyleName, so the label has to be recomputed.
-    self.style_name = nil
     self.ui:handleEvent(Event:new(spec.event, value))
     return true
 end
@@ -467,6 +487,13 @@ end
 -- Applying ------------------------------------------------------------------
 
 function ReadingStyle:getCss()
+    -- Only ever set inside the preview subprocess, which dies with it. The
+    -- stylesheet hook installed at init() then hands crengine the candidate
+    -- instead of the current style, and nothing else has to change. Setting
+    -- this in the reader's own process would apply the candidate for real.
+    if self.preview_css then
+        return self.preview_css
+    end
     if self.css == nil then
         self.css = Css.build(self:getStyle())
     end
@@ -480,6 +507,12 @@ function ReadingStyle:styleChanged(immediate)
     self.css = nil
     self.style_name = nil
     self.pending = true
+    if self.sandbox then
+        -- The style tables are plain data: changing them shows up nowhere until
+        -- something applies them, so a sandbox only has to stop applying.
+        self.sandbox:markChanged()
+        return
+    end
     if self.defer_apply then
         -- The quick style screen batches every change itself and flushes them
         -- in one go; scheduling here as well would re-render the book twice.
@@ -495,6 +528,13 @@ function ReadingStyle:styleChanged(immediate)
 end
 
 function ReadingStyle:applyNow()
+    if self.sandbox then
+        -- Reached from the quick screen's flush and the menu's "Apply now",
+        -- both of which stay usable under a preview. The preview's own Apply
+        -- is the only way out of the sandbox.
+        self.sandbox:markChanged()
+        return
+    end
     UIManager:unschedule(self.apply_callback)
     self.css = nil
     self.pending = false
@@ -727,6 +767,132 @@ end
 function ReadingStyle:showQuickStyle()
     if not self.active then return end
     Quick.show(self)
+end
+
+-- Preview sandbox -----------------------------------------------------------
+--
+-- While a preview is open the reader can change anything this plugin owns, and
+-- none of it may reach the book: the forked preview process is the only thing
+-- that renders those changes. Two properties make that possible, and they are
+-- the reason every control in this plugin goes through the same few functions:
+--
+--   * the style tables are plain data. A change to them is invisible until
+--     something applies it, so the sandbox simply stops applying (styleChanged
+--     and applyNow above).
+--   * setEngineValue is the only place a KOReader document setting is driven,
+--     so the sandbox intercepts it and remembers the value instead.
+--
+-- Cancelling therefore has nothing to undo on the engine side — nothing was
+-- ever set — and only has to put the style tables back where they were.
+
+function ReadingStyle:beginSandbox()
+    if self.sandbox then return self.sandbox end
+    self.sandbox = Sandbox.new{
+        scope = self.scope,
+        pending = self.pending,
+        global = self.global_style,
+        book = self.book_style,
+        languages = self.language_styles,
+    }
+    return self.sandbox
+end
+
+function ReadingStyle:inSandbox()
+    return self.sandbox ~= nil
+end
+
+--- The pending engine values, to hand to the preview subprocess.
+function ReadingStyle:sandboxEngine()
+    return self.sandbox and self.sandbox.engine or {}
+end
+
+--- True once, per change: the preview asks after every settings screen closes
+-- so it knows whether it has to render again.
+function ReadingStyle:takeSandboxChange()
+    if not self.sandbox then return false end
+    return self.sandbox:takeChange()
+end
+
+--- Called by a settings screen as it closes. A preview holding the sandbox
+-- registers a watcher here, so that whichever screen the reader used — the
+-- menu, the quick screen — the preview knows to render again. A no-op when no
+-- preview is open, which is what every caller expects.
+function ReadingStyle:settingsScreenClosed()
+    local sandbox = self.sandbox
+    if not sandbox or not sandbox.watcher then return end
+    sandbox.watcher()
+end
+
+--- Ends the sandbox: keep = true applies everything the reader chose there to
+-- the book for real, keep = false leaves the book exactly as it was found.
+function ReadingStyle:endSandbox(keep)
+    local sandbox = self.sandbox
+    if not sandbox then return end
+    self.sandbox = nil
+
+    if keep then
+        -- Engine settings first, each through its own event, then one apply for
+        -- the style half: the same order and the same cost as the quick screen's
+        -- flush, which is the closest thing to this the plugin already had.
+        local engine_changes = sandbox:orderedEngine()
+        for _index, change in ipairs(engine_changes) do
+            self:setEngineValue(change.key, change.value)
+        end
+        self.css = nil
+        self.style_name = nil
+        -- Nothing changed under the preview: applying anyway would re-render the
+        -- book for no reason, which is exactly what a preview exists to avoid.
+        if self.pending or #engine_changes > 0 then
+            self:applyNow()
+        end
+        return
+    end
+
+    local restored = sandbox:restored()
+    self.global_style = restored.global
+    self.book_style = restored.book
+    self.language_styles = restored.languages
+    self.scope = restored.scope
+    self.pending = restored.pending
+    self.css = nil
+    self.style_name = nil
+end
+
+-- Preview -------------------------------------------------------------------
+--
+-- Loaded on demand, and only ever from these two functions: a reader who never
+-- opens a preview never loads the code, never forks anything, and pays nothing
+-- for the feature existing.
+
+function ReadingStyle:canPreview()
+    if not self.active then return false end
+    local ok, Preview = pcall(require, "readingstyle_preview")
+    if not ok then
+        logger.warn("ReadingStyle: preview module missing:", Preview)
+        return false
+    end
+    return Preview.isAvailable(self)
+end
+
+--- opts: engine (engine values to start the sandbox with), css (candidate).
+-- Applying and cancelling belong to the preview screen: it owns the sandbox
+-- for as long as it is open.
+function ReadingStyle:showPreview(opts)
+    if not self.active then return end
+    -- One at a time: the sandbox has a single owner, and the settings screens
+    -- reachable from inside a preview can lead back here.
+    if self:inSandbox() then return end
+    local ok, PreviewView = pcall(require, "readingstyle_preview_view")
+    if not ok then
+        logger.warn("ReadingStyle: preview view missing:", PreviewView)
+        Notification:notify(_("Preview is not available on this device."))
+        return
+    end
+    if not self:canPreview() then
+        Notification:notify(_("Preview is not available for this book."))
+        return
+    end
+    PreviewView.show(self, opts or {})
 end
 
 function ReadingStyle.getPresets()

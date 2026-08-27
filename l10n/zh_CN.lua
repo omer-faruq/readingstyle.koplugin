@@ -23,6 +23,8 @@ return {
         "关于阅读样式与样式微调",
     ["Advanced"] =
         "高级",
+    ["After"] =
+        "之后",
     ["Align"] =
         "对齐",
     ["Aligning images turns them into blocks, which pulls inline images — drop caps, small icons inside a line of text — out of their line. Leave at book default unless you need it."] =
@@ -43,8 +45,12 @@ return {
         "立即应用",
     ["Apply to: %1"] =
         "应用于：%1",
+    ["Applying this will reload the book."] =
+        "应用此设置将重新加载本书。",
     ["Avoid widows and orphans"] =
         "避免孤行与寡行",
+    ["Before"] =
+        "之前",
     ["Blank line between paragraphs, no indentation, generous line spacing and margins. Easy on tired eyes."] =
         "段落之间空一行，不缩进，行距和边距都很宽裕。适合疲劳的眼睛。",
     ["Block quotes"] =
@@ -61,6 +67,8 @@ return {
         "该语言的书籍",
     ["Bottom margin"] =
         "下页边距",
+    ["Cancel"] =
+        "取消",
     ["Caps every image at the width and height of the page, so oversized images no longer spill past the margins."] =
         "把每张图片限制在页面的宽高之内，使过大的图片不再溢出页边距。",
     ["Centered"] =
@@ -111,6 +119,8 @@ return {
         "删除该层级上保存的样式。编辑对象转到上一层级，由它的样式接管。",
     ["Do not indent the first line of the paragraph that follows a heading, which is the usual typographic convention.\n\nOnly reaches paragraphs that directly follow the heading. Books that wrap their chapter opening in a container are out of reach."] =
         "不缩进紧接标题之后那一段的首行，这是通行的排版惯例。\n\n只对直接跟在标题后面的段落生效。若书籍把章节开头包在容器里，则无法触及。",
+    ["Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\n\nThe book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing."] =
+        "在单独的进程中用这些设置绘制您当前所在的页面，并在本书发生任何变化之前展示给您。\n\n除非您在预览中选择“应用”，否则本书不会重新渲染，也不会保存任何内容，所以查看是没有代价的。",
     ["E-reader"] =
         "电子阅读器",
     ["Edit this book's own tweak"] =
@@ -135,6 +145,8 @@ return {
         "在每个章节标题前强制分页，如同印刷书籍。\n\n选择 H1 和 H2 时，副标题也不会单独另起一页。",
     ["Force black text"] =
         "强制黑色文字",
+    ["Full page"] =
+        "整页",
     ["H1 and H2"] =
         "H1 和 H2",
     ["H1 only"] =
@@ -169,6 +181,8 @@ return {
         "缩进并用斜体",
     ["Ink and links"] =
         "墨色与链接",
+    ["Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it."] =
+        "在预览中您可以继续更改设置和翻页：您在那里更改的一切都会被保留，直到您应用为止。",
     ["Italic"] =
         "斜体",
     ["Justified"] =
@@ -211,6 +225,8 @@ return {
         "不作特殊处理",
     ["Normal"] =
         "标准",
+    ["Not available from inside a preview: that editor writes to the book itself, which a preview must not do."] =
+        "无法在预览中使用：该编辑器会直接写入书籍，而预览不应这样做。",
     ["Nothing is being generated: every setting is at book default."] =
         "当前没有生成任何内容：所有设置都保持在书籍默认。",
     ["On H1"] =
@@ -237,12 +253,24 @@ return {
         "段落",
     ["Plain controls for the settings that decide how a book looks — paragraph indentation and spacing, space around chapter titles, alignment, margins, images — with presets and per-book or per-language styles.\n\nBuilds on KOReader's style tweaks rather than replacing them: everything left at \"book default\" leaves your tweaks and the publisher's styles untouched."] =
         "用简单的控件调整决定书籍外观的各项设置——段落缩进与间距、章节标题周围的空白、对齐、页边距、图片——并支持预设以及按书籍或按语言的样式。\n\n它建立在 KOReader 的样式微调之上，而非取而代之：凡是保持在“书籍默认”的项目，都不会影响你的样式微调和出版方的样式。",
+    ["Playground"] =
+        "试验场",
     ["Presets"] =
         "预设",
     ["Prettify"] =
         "格式化",
     ["Prevent images from overflowing the page"] =
         "防止图片超出页面",
+    ["Preview is not available for this book."] =
+        "本书无法使用预览。",
+    ["Preview is not available on this device."] =
+        "此设备无法使用预览。",
+    ["Preview: after"] =
+        "预览：之后",
+    ["Preview: before"] =
+        "预览：之前",
+    ["Preview: before | after"] =
+        "预览：之前 | 之后",
     ["Printed-book typography: indented paragraphs with no gap between them, centred chapter titles with room above."] =
         "纸质书排版：段落首行缩进且彼此不留空，章节标题居中并在上方留出空间。",
     ["Publisher default"] =
@@ -263,6 +291,8 @@ return {
         "去掉标题后第一段上方的段间距，使其紧贴章节标题下方。",
     ["Removes every image from the page, for reading a heavily illustrated book as plain text.\n\nCaptions stay, since they are ordinary text."] =
         "移除页面上的所有图片，便于把插图繁多的书当作纯文本阅读。\n\n图片说明会保留，因为它们是普通文字。",
+    ["Rendering the book with the new style…\n\nThe book on screen is not being changed. This takes about as long as applying the style would."] =
+        "正在用新样式渲染本书……\n\n屏幕上的书没有被改变。这大约与应用样式所需的时间相同。",
     ["Replace"] =
         "替换",
     ["Replaces italics with something else. Worth it when a book's italic face is thin or hard to read on screen."] =
@@ -307,8 +337,18 @@ return {
         "已保存到 %1\n\n重启 KOReader 后，可在“样式微调”的用户样式微调中找到它。",
     ["Scaling"] =
         "缩放",
+    ["Settings"] =
+        "设置",
+    ["Show after"] =
+        "显示之后",
+    ["Show before"] =
+        "显示之前",
     ["Shrinks footnote markers and the like, and stops them from stretching the line they sit on."] =
         "缩小脚注标记之类的字符，并避免它们撑高所在的那一行。",
+    ["Side by side"] =
+        "并排显示",
+    ["Side margins"] =
+        "左右页边距",
     ["Size of chapter titles, as a percentage of the surrounding text.\n\n"] =
         "章节标题的大小，以周围正文的百分比表示。\n\n",
     ["Small capitals"] =
@@ -339,14 +379,24 @@ return {
         "文本对齐",
     ["The familiar e-reader look: no indentation, a small gap between paragraphs, moderate spacing throughout."] =
         "常见的电子阅读器观感：不缩进，段落之间留一点空隙，整体间距适中。",
+    ["The preview could not be rendered on this device."] =
+        "此设备无法渲染预览。",
+    ["The preview did not produce a page."] =
+        "预览未生成页面。",
+    ["The preview failed."] =
+        "预览失败。",
     ["The settings people reach for most, on one screen. Can also be opened with a gesture."] =
         "把最常用的设置集中在一屏。也可以通过手势打开。",
     ["The style you edit here is used for every book that has no style of its own."] =
         "在此编辑的样式适用于所有没有专属样式的书籍。",
+    ["There is not enough free memory for a preview right now.\n\nA preview renders a second copy of the book in a separate process, which needs room. Closing other things, or reopening the book, usually frees enough."] =
+        "目前没有足够的可用内存来进行预览。\n\n预览会在单独的进程中渲染本书的第二份副本，这需要内存空间。关闭其他内容或重新打开本书通常能释放足够的内存。",
     ["This book"] =
         "本书",
     ["This book only"] =
         "仅本书",
+    ["This page has not been rendered yet."] =
+        "此页面尚未渲染。",
     ["This plugin writes a small stylesheet and appends it after your style tweaks, so its settings win wherever the two overlap.\n\nAnything left at \"book default\" emits nothing at all, and leaves your tweaks and the publisher's styles untouched.\n\nEvery change re-renders the book. That is normal, and is what KOReader does for any style change."] =
         "本插件会生成一小段样式表，并追加在你的样式微调之后，因此两者重叠时以本插件的设置为准。\n\n凡是保持在“书籍默认”的项目都不会生成任何内容，你的样式微调和出版方的样式都不受影响。\n\n每次更改都会重新排版整本书。这是正常现象，KOReader 对任何样式更改都是如此。",
     ["This replaces the style already stored at that level with the settings you are looking at now.\n\nContinue?"] =
@@ -357,6 +407,8 @@ return {
         "上页边距",
     ["Traditional"] =
         "传统",
+    ["Try"] =
+        "试用",
     ["Two numbers, and only the first one pushes words apart.\n\nScaling is the width of every space, as a percentage of the font's own space character. 100% is the font's natural width, and KOReader's default is 95% — slightly narrower. Go above 100% for wider gaps.\n\nReduction is how far justification may squeeze those spaces back to fit another word on the line. 100% forbids squeezing, so raise it as well or the wider gaps will not hold."] =
         "这是两个数值，只有第一个会把词语拉开。\n\n缩放是每个空格的宽度，以字体自带空格字符的百分比表示。100% 为字体的自然宽度，而 KOReader 的默认值是 95%——略窄一些。想要更大的间隙就调到 100% 以上。\n\n压缩是指两端对齐时，为了让一行多容纳一个词，这些空格最多可以被压回多少。100% 表示完全不允许压缩，因此也要把它调高，否则加宽的间隙留不住。",
     ["Typography and hyphenation: %1"] =
@@ -403,4 +455,8 @@ return {
         "关",
     ["on"] =
         "开",
+    ["page %1 of %2"] =
+        "第 %1 页，共 %2 页",
+    ["style changes"] =
+        "样式更改",
 }

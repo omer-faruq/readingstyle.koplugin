@@ -242,6 +242,22 @@ function Settings.copy(style)
     return copy
 end
 
+--- A detached copy of a whole per-language table: every profile in it copied,
+-- not just the outer table. What the preview sandbox has to be able to put back
+-- when the reader cancels, since editing under a preview can create, change or
+-- empty any level.
+function Settings.copyLanguages(languages)
+    local copy = {}
+    if type(languages) == "table" then
+        for code, style in pairs(languages) do
+            if type(code) == "string" and type(style) == "table" then
+                copy[code] = Settings.copy(style)
+            end
+        end
+    end
+    return copy
+end
+
 function Settings.isEmpty(style)
     if not style then return true end
     for _, key in ipairs(Settings.CSS_KEYS) do

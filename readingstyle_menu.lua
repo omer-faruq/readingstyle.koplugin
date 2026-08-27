@@ -678,7 +678,11 @@ local function advancedMenu(plugin)
             },
             {
                 text = _("Edit this book's own tweak"),
-                help_text = _("Opens KOReader's book-specific style tweak editor, with its CSS suggestions and prettifier. That tweak is stored by KOReader, separately from this plugin, and applies before these settings."),
+                help_text = _("Opens KOReader's book-specific style tweak editor, with its CSS suggestions and prettifier. That tweak is stored by KOReader, separately from this plugin, and applies before these settings.")
+                    .. "\n\n" .. _("Not available from inside a preview: that editor writes to the book itself, which a preview must not do."),
+                -- Reaches straight into ReaderStyleTweak, which edits the live
+                -- book. There is no way to hold that inside a preview sandbox.
+                enabled_func = function() return not plugin:inSandbox() end,
                 keep_menu_open = true,
                 callback = function(touchmenu_instance)
                     plugin.ui.styletweak:onEditBookTweak(touchmenu_instance)
@@ -858,16 +862,37 @@ end
 
 -- Assembly ------------------------------------------------------------------
 
-function Menu.build(plugin)
+--- opts.sandbox is set when this tree is shown inside a preview. Two kinds of
+-- item behave differently there: the submenus borrowed whole from other
+-- KOReader modules are left out (they drive the live book and cannot be held
+-- back), and the items about applying are disabled, because inside a preview
+-- the preview's own buttons decide when anything is applied.
+function Menu.build(plugin, opts)
+    local sandbox = opts and opts.sandbox
     local items = {
+        -- The two ways in, before the settings themselves: one screen of the
+        -- controls people reach for, and the place to try anything at all
+        -- without the book being touched.
         {
             text = _("Quick style"),
             help_text = _("The settings people reach for most, on one screen. Can also be opened with a gesture."),
             keep_menu_open = true,
-            separator = true,
             callback = function(touchmenu_instance)
                 if touchmenu_instance then touchmenu_instance:closeMenu() end
                 plugin:showQuickStyle()
+            end,
+        },
+        {
+            -- Named for what it is rather than for what it shows: the reader can
+            -- change anything in here and nothing reaches the book until they apply.
+            text = _("Playground"),
+            help_text = _("Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\n\nThe book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing.")
+                .. "\n\n" .. _("Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it."),
+            separator = true,
+            enabled_func = function() return plugin:canPreview() and not plugin:inSandbox() end,
+            callback = function(touchmenu_instance)
+                if touchmenu_instance then touchmenu_instance:closeMenu() end
+                plugin:showPreview()
             end,
         },
         paragraphsMenu(plugin),
@@ -877,14 +902,14 @@ function Menu.build(plugin)
 
     -- Hyphenation belongs with the text settings, and it comes attached to the
     -- language it depends on.
-    local typography = typographyMenu(plugin)
+    local typography = not sandbox and typographyMenu(plugin) or nil
     if typography then
         items[#items + 1] = typography
     end
 
     items[#items + 1] = pageLayoutMenu(plugin)
 
-    local headers_footers = headersFootersMenu(plugin)
+    local headers_footers = not sandbox and headersFootersMenu(plugin) or nil
     if headers_footers then
         items[#items + 1] = headers_footers
     end
@@ -901,12 +926,15 @@ function Menu.build(plugin)
         text = _("Apply changes immediately"),
         help_text = _("On, changes appear as soon as you make them. Off, they are collected and only applied when you choose \"Apply now\".\n\nEach apply re-renders the book, so turning this off is worth it when you are changing several settings at once."),
         checked_func = function() return plugin.auto_apply end,
+        enabled_func = function() return not plugin:inSandbox() end,
         callback = function() plugin:setAutoApply(not plugin.auto_apply) end,
     }
     items[#items + 1] = {
         text = _("Apply now"),
         keep_menu_open = true,
-        enabled_func = function() return plugin:hasPendingChanges() end,
+        enabled_func = function()
+            return plugin:hasPendingChanges() and not plugin:inSandbox()
+        end,
         callback = function() plugin:applyNow() end,
     }
     items[#items + 1] = {

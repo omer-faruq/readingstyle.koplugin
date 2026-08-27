@@ -491,5 +491,253 @@ check("false is a stored value, not an absent one", (function()
 end)())
 
 print("")
+print("preview protocol")
+local Protocol = require("readingstyle_preview_protocol")
+
+check("length round trip", (function()
+    for _index, n in ipairs({ 0, 1, 255, 256, 65535, 70000, 16777216, 4294967295 }) do
+        local packed = Protocol.packLength(n)
+        if #packed ~= 4 then return false, n .. " packed to " .. #packed end
+        if Protocol.unpackLength(packed) ~= n then return false, n end
+    end
+    return true
+end)())
+check("length rejects the impossible", Protocol.packLength(-1) == nil
+    and Protocol.packLength(4294967296) == nil and Protocol.packLength("x") == nil)
+
+local MB = 1024 * 1024
+local RESERVE = 48 * MB
+local IMAGE = 1.5 * MB
+
+check("window: no idea how much memory there is, so the smallest window", (function()
+    local back, forward = Protocol.windowFor(nil, IMAGE, RESERVE)
+    return back == 0 and forward == 0
+end)())
+
+check("window: nothing left after the render reserve is a refusal", (function()
+    return Protocol.windowFor(RESERVE, IMAGE, RESERVE) == nil
+       and Protocol.windowFor(RESERVE - MB, IMAGE, RESERVE) == nil
+       and Protocol.windowFor(0, IMAGE, RESERVE) == nil
+end)())
+
+check("window: one page fits, so one page it is", (function()
+    -- A position costs two images, one per side.
+    local back, forward = Protocol.windowFor(RESERVE + 2 * IMAGE, IMAGE, RESERVE)
+    return back == 0 and forward == 0
+end)())
+
+check("window: it grows with what is free, and stops growing", (function()
+    local cases = {
+        { free = RESERVE + 4 * IMAGE,   back = 0, forward = 1 },
+        { free = RESERVE + 6 * IMAGE,   back = 1, forward = 1 },
+        { free = RESERVE + 8 * IMAGE,   back = 1, forward = 2 },
+        { free = RESERVE + 10 * IMAGE,  back = 1, forward = 3 },
+        { free = RESERVE + 12 * IMAGE,  back = 1, forward = 4 },
+        -- Capped: a roomy device does not get an ever-growing window.
+        { free = RESERVE + 400 * IMAGE, back = 1, forward = 4 },
+    }
+    for _index, case in ipairs(cases) do
+        local back, forward = Protocol.windowFor(case.free, IMAGE, RESERVE)
+        if back ~= case.back or forward ~= case.forward then
+            return false, string.format("%d images free -> %s,%s",
+                (case.free - RESERVE) / IMAGE, tostring(back), tostring(forward))
+        end
+    end
+    return true
+end)())
+
+check("window: it always leans forward", (function()
+    -- Every window with room for more than two pages keeps exactly one page of
+    -- context behind and spends the rest ahead, which is where reading goes.
+    for images = 6, 40, 2 do
+        local back, forward = Protocol.windowFor(RESERVE + images * IMAGE, IMAGE, RESERVE)
+        if back ~= 1 or forward < 1 or forward > back + forward then
+            return false, string.format("%d images -> %s,%s", images, tostring(back), tostring(forward))
+        end
+    end
+    return true
+end)())
+
+check("window: a bigger screen buys fewer pages", (function()
+    local free = RESERVE + 8 * IMAGE
+    local small_back, small_forward = Protocol.windowFor(free, IMAGE, RESERVE)
+    local large_back, large_forward = Protocol.windowFor(free, 4 * IMAGE, RESERVE)
+    return small_back + small_forward > large_back + large_forward
+end)())
+
+check("window: a nonsense image size does not crash it", (function()
+    local back, forward = Protocol.windowFor(RESERVE + 100 * MB, 0, RESERVE)
+    return back == 0 and forward == 0
+end)())
+
+local BASE = { 10, 12, 10, 14 } -- left, top, right, bottom, as ReaderTypeset keeps them
+check("margins: nothing pending leaves the base alone", (function()
+    local m = Protocol.marginsFor(BASE, {}, false)
+    return m[1] == 10 and m[2] == 12 and m[3] == 10 and m[4] == 14
+end)())
+check("margins: horizontal pair goes to left and right", (function()
+    local m = Protocol.marginsFor(BASE, { h_page_margins = { 4, 6 } }, false)
+    return m[1] == 4 and m[3] == 6 and m[2] == 12 and m[4] == 14
+end)())
+check("margins: top alone does not move the bottom", (function()
+    local m = Protocol.marginsFor(BASE, { t_page_margin = 2 }, false)
+    return m[2] == 2 and m[4] == 14
+end)())
+check("margins: syncing carries top onto bottom", (function()
+    local m = Protocol.marginsFor(BASE, { t_page_margin = 2 }, true)
+    return m[2] == 2 and m[4] == 2
+end)())
+check("margins: the base table is not modified", (function()
+    Protocol.marginsFor(BASE, { t_page_margin = 0, h_page_margins = { 0, 0 } }, true)
+    return BASE[1] == 10 and BASE[2] == 12 and BASE[3] == 10 and BASE[4] == 14
+end)())
+check("touchesMargins", Protocol.touchesMargins({ line_spacing = 120 }) == false
+    and Protocol.touchesMargins({ b_page_margin = 3 }) == true
+    and Protocol.touchesMargins(nil) == false)
+
+check("engine values are formatted like their menus", (function()
+    return Protocol.formatEngineValue("line_spacing", 120) == "120%"
+       and Protocol.formatEngineValue("word_spacing", { 95, 75 }) == "95/75%"
+       and Protocol.formatEngineValue("font_base_weight", 0.25) == "+0.25"
+       and Protocol.formatEngineValue("t_page_margin", 4) == "4"
+       and Protocol.formatEngineValue("line_spacing", nil) == nil
+       and Protocol.formatEngineValue("not_a_setting", 1) == nil
+end)())
+
+check("summary lists only what actually differs", (function()
+    local current = { line_spacing = 105, t_page_margin = 4, word_spacing = { 100, 75 } }
+    local summary = Protocol.summarizeEngine(current, {
+        line_spacing = 120,
+        t_page_margin = 4,               -- unchanged: must not be mentioned
+        word_spacing = { 100, 75 },      -- unchanged pair: must not be mentioned
+    })
+    return summary == "Line spacing 105% → 120%", summary
+end)())
+check("summary is nil when nothing differs", (function()
+    return Protocol.summarizeEngine({ line_spacing = 120 }, { line_spacing = 120 }) == nil
+       and Protocol.summarizeEngine({}, {}) == nil
+       and Protocol.summarizeEngine(nil, nil) == nil
+end)())
+check("summary keeps a fixed order", (function()
+    local summary = Protocol.summarizeEngine({}, { t_page_margin = 4, line_spacing = 120 })
+    -- ENGINE_KEYS order: line spacing comes before the margins.
+    return summary == "Line spacing — → 120%  ·  Top margin — → 4", summary
+end)())
+
+check("subtitle folds in the style half", (function()
+    return Protocol.subtitle("Line spacing 105% → 120%", true)
+            == "Line spacing 105% → 120%  ·  style changes"
+       and Protocol.subtitle(nil, true) == "style changes"
+       and Protocol.subtitle("x", false) == "x"
+       and Protocol.subtitle(nil, false) == nil
+end)())
+
+print("")
+print("preview sandbox")
+local Sandbox = require("readingstyle_sandbox")
+
+local function liveState()
+    return {
+        scope = Settings.SCOPE_GLOBAL,
+        pending = false,
+        global = { para_indent = 1.2 },
+        book = nil,
+        languages = { tr = { para_spacing = 0.5 } },
+    }
+end
+
+check("snapshot is detached from the live tables", (function()
+    local state = liveState()
+    local sandbox = Sandbox.new(state)
+    -- Everything a settings screen can do while a preview is open:
+    state.global.para_indent = 4
+    state.global.chapter_bold = true
+    state.languages.tr.para_spacing = 3
+    state.languages.de = { para_indent = 2 }
+    local restored = sandbox:restored()
+    return restored.global.para_indent == 1.2
+       and restored.global.chapter_bold == nil
+       and restored.languages.tr.para_spacing == 0.5
+       and restored.languages.de == nil
+end)())
+
+check("restoring twice gives the same thing twice", (function()
+    local sandbox = Sandbox.new(liveState())
+    local first = sandbox:restored()
+    first.global.para_indent = 99
+    first.languages.tr.para_spacing = 99
+    local second = sandbox:restored()
+    return second.global.para_indent == 1.2 and second.languages.tr.para_spacing == 0.5
+end)())
+
+check("scope and pending come back too", (function()
+    local state = liveState()
+    state.scope = Settings.SCOPE_BOOK
+    state.pending = true
+    local restored = Sandbox.new(state):restored()
+    return restored.scope == Settings.SCOPE_BOOK and restored.pending == true
+end)())
+
+check("a book style that did not exist stays absent", (function()
+    local restored = Sandbox.new(liveState()):restored()
+    return restored.book == nil
+end)())
+
+check("a book style that did exist comes back", (function()
+    local state = liveState()
+    state.book = { para_indent = 0 }
+    local restored = Sandbox.new(state):restored()
+    return restored.book ~= nil and restored.book.para_indent == 0
+end)())
+
+check("engine values are held, not applied", (function()
+    local sandbox = Sandbox.new(liveState())
+    if sandbox:engineValue("line_spacing") ~= nil then return false, "starts set" end
+    if not sandbox:setEngine("line_spacing", 120) then return false, "would not set" end
+    if sandbox:setEngine("not_a_setting", 1) then return false, "accepted junk" end
+    return sandbox:engineValue("line_spacing") == 120
+end)())
+
+check("applying order follows the schema, not table iteration", (function()
+    local sandbox = Sandbox.new(liveState())
+    sandbox:setEngine("b_page_margin", 4)
+    sandbox:setEngine("line_spacing", 120)
+    sandbox:setEngine("t_page_margin", 2)
+    local ordered = sandbox:orderedEngine()
+    local keys = {}
+    for _index, change in ipairs(ordered) do keys[#keys + 1] = change.key end
+    -- ENGINE_KEYS order: line_spacing … t_page_margin, b_page_margin
+    return #keys == 3 and keys[1] == "line_spacing"
+       and keys[2] == "t_page_margin" and keys[3] == "b_page_margin",
+        table.concat(keys, ",")
+end)())
+
+check("a change is reported once", (function()
+    local sandbox = Sandbox.new(liveState())
+    if sandbox:takeChange() then return false, "dirty from the start" end
+    sandbox:markChanged()
+    if not sandbox:takeChange() then return false, "change not reported" end
+    return sandbox:takeChange() == false
+end)())
+
+check("setting an engine value counts as a change", (function()
+    local sandbox = Sandbox.new(liveState())
+    sandbox:setEngine("line_spacing", 120)
+    return sandbox:takeChange() == true and sandbox:hasEngineChanges() == true
+end)())
+
+check("an empty sandbox has nothing to apply", (function()
+    local sandbox = Sandbox.new(liveState())
+    return sandbox:hasEngineChanges() == false and #sandbox:orderedEngine() == 0
+end)())
+
+check("copyLanguages drops junk keys and detaches each profile", (function()
+    local original = { tr = { para_indent = 1 }, [5] = { para_indent = 2 }, de = "not a table" }
+    local copy = Settings.copyLanguages(original)
+    original.tr.para_indent = 9
+    return copy.tr.para_indent == 1 and copy[5] == nil and copy.de == nil
+end)())
+
+print("")
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILURE(S)"))
 os.exit(failures == 0 and 0 or 1)

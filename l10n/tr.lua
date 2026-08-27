@@ -23,6 +23,8 @@ return {
         "Okuma stili ve stil ince ayarları hakkında",
     ["Advanced"] =
         "Gelişmiş",
+    ["After"] =
+        "Sonra",
     ["Align"] =
         "Hiza",
     ["Aligning images turns them into blocks, which pulls inline images — drop caps, small icons inside a line of text — out of their line. Leave at book default unless you need it."] =
@@ -43,8 +45,12 @@ return {
         "Şimdi uygula",
     ["Apply to: %1"] =
         "Uygulanacak: %1",
+    ["Applying this will reload the book."] =
+        "Bunu uygulamak kitabı yeniden yükleyecek.",
     ["Avoid widows and orphans"] =
         "Dul ve yetim satırları önle",
+    ["Before"] =
+        "Önce",
     ["Blank line between paragraphs, no indentation, generous line spacing and margins. Easy on tired eyes."] =
         "Paragraflar arasında boş satır, girinti yok, cömert satır aralığı ve kenar boşlukları. Yorgun gözler için rahat.",
     ["Block quotes"] =
@@ -61,6 +67,8 @@ return {
         "Bu dildeki kitaplar",
     ["Bottom margin"] =
         "Alt kenar boşluğu",
+    ["Cancel"] =
+        "Vazgeç",
     ["Caps every image at the width and height of the page, so oversized images no longer spill past the margins."] =
         "Her görseli sayfanın genişliği ve yüksekliğiyle sınırlar; böylece aşırı büyük görseller kenar boşluklarının dışına taşmaz.",
     ["Centered"] =
@@ -111,6 +119,8 @@ return {
         "O seviyede saklanan stili siler. Düzenleme bir üst seviyeye geçer ve oradaki stil devralır.",
     ["Do not indent the first line of the paragraph that follows a heading, which is the usual typographic convention.\n\nOnly reaches paragraphs that directly follow the heading. Books that wrap their chapter opening in a container are out of reach."] =
         "Başlığı doğrudan izleyen paragrafın ilk satırını girintilemez; alışılmış tipografi kuralı budur.\n\nYalnızca başlığın hemen ardından gelen paragraflara ulaşır. Bölüm başlangıcını bir kapsayıcı içine saran kitaplar erişim dışındadır.",
+    ["Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\n\nThe book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing."] =
+        "Bulunduğunuz sayfayı bu ayarlarla ayrı bir süreçte çizer ve kitapta hiçbir şey olmadan önce size gösterir.\n\nOrada \"Uygula\" demediğiniz sürece kitap yeniden işlenmez ve hiçbir şey kaydedilmez; bakmanın bir bedeli yoktur.",
     ["E-reader"] =
         "E-okuyucu",
     ["Edit this book's own tweak"] =
@@ -135,6 +145,8 @@ return {
         "Her bölüm başlığından önce sayfa sonu koyar; basılı kitaplardaki gibi.\n\nH1 ve H2 seçilirse, alt başlığın kendi başına ikinci bir sayfa açması da engellenir.",
     ["Force black text"] =
         "Metni siyaha zorla",
+    ["Full page"] =
+        "Tam sayfa",
     ["H1 and H2"] =
         "H1 ve H2",
     ["H1 only"] =
@@ -169,6 +181,8 @@ return {
         "Girintili ve italik",
     ["Ink and links"] =
         "Mürekkep ve bağlantılar",
+    ["Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it."] =
+        "Önizlemenin içinde ayarları değiştirmeye ve sayfa çevirmeye devam edebilirsiniz: orada değiştirdiğiniz her şey siz uygulayana kadar bekletilir.",
     ["Italic"] =
         "İtalik",
     ["Justified"] =
@@ -211,6 +225,8 @@ return {
         "Özel biçim yok",
     ["Normal"] =
         "Normal",
+    ["Not available from inside a preview: that editor writes to the book itself, which a preview must not do."] =
+        "Önizlemenin içinden kullanılamaz: o düzenleyici doğrudan kitaba yazar, önizlemenin yapmaması gereken şey de budur.",
     ["Nothing is being generated: every setting is at book default."] =
         "Hiçbir şey üretilmiyor: bütün ayarlar kitap varsayılanında.",
     ["On H1"] =
@@ -237,12 +253,24 @@ return {
         "Paragraflar",
     ["Plain controls for the settings that decide how a book looks — paragraph indentation and spacing, space around chapter titles, alignment, margins, images — with presets and per-book or per-language styles.\n\nBuilds on KOReader's style tweaks rather than replacing them: everything left at \"book default\" leaves your tweaks and the publisher's styles untouched."] =
         "Bir kitabın nasıl göründüğüne karar veren ayarlar için sade denetimler — paragraf girintisi ve aralığı, bölüm başlıklarının çevresindeki boşluk, hizalama, kenar boşlukları, görseller — hazır ayarlar ve kitap ya da dil bazında stillerle birlikte.\n\nKOReader'ın stil ince ayarlarının yerine geçmez, üzerine kurulur: \"kitap varsayılanı\"nda bırakılan her şey, ince ayarlarınıza ve yayıncının stillerine dokunmaz.",
+    ["Playground"] =
+        "Deneme alanı",
     ["Presets"] =
         "Hazır ayarlar",
     ["Prettify"] =
         "Biçimlendir",
     ["Prevent images from overflowing the page"] =
         "Görsellerin sayfadan taşmasını engelle",
+    ["Preview is not available for this book."] =
+        "Bu kitap için önizleme kullanılamıyor.",
+    ["Preview is not available on this device."] =
+        "Bu cihazda önizleme kullanılamıyor.",
+    ["Preview: after"] =
+        "Önizleme: sonrası",
+    ["Preview: before"] =
+        "Önizleme: öncesi",
+    ["Preview: before | after"] =
+        "Önizleme: önce | sonra",
     ["Printed-book typography: indented paragraphs with no gap between them, centred chapter titles with room above."] =
         "Basılı kitap tipografisi: aralarında boşluk olmayan girintili paragraflar, üstünde yer bırakılmış ortalanmış bölüm başlıkları.",
     ["Publisher default"] =
@@ -263,6 +291,8 @@ return {
         "Başlıktan sonraki ilk paragrafın üstündeki boşluğu kaldırır; paragraf doğrudan bölüm başlığının altına oturur.",
     ["Removes every image from the page, for reading a heavily illustrated book as plain text.\n\nCaptions stay, since they are ordinary text."] =
         "Sayfadaki bütün görselleri kaldırır; bol resimli bir kitabı düz metin gibi okumak için.\n\nResim altyazıları kalır, çünkü onlar sıradan metindir.",
+    ["Rendering the book with the new style…\n\nThe book on screen is not being changed. This takes about as long as applying the style would."] =
+        "Kitap yeni stille işleniyor…\n\nEkrandaki kitap değiştirilmiyor. Bu işlem, stili uygulamakla aşağı yukarı aynı sürer.",
     ["Replace"] =
         "Değiştir",
     ["Replaces italics with something else. Worth it when a book's italic face is thin or hard to read on screen."] =
@@ -307,8 +337,18 @@ return {
         "%1 konumuna kaydedildi\n\nKOReader yeniden başlatıldığında Stil ince ayarları altında, Kullanıcı stil ince ayarları içinde görünür.",
     ["Scaling"] =
         "Ölçekleme",
+    ["Settings"] =
+        "Ayarlar",
+    ["Show after"] =
+        "Sonrasını göster",
+    ["Show before"] =
+        "Öncesini göster",
     ["Shrinks footnote markers and the like, and stops them from stretching the line they sit on."] =
         "Dipnot işaretlerini ve benzerlerini küçültür, bulundukları satırı germelerini engeller.",
+    ["Side by side"] =
+        "Yan yana",
+    ["Side margins"] =
+        "Yan kenar boşlukları",
     ["Size of chapter titles, as a percentage of the surrounding text.\n\n"] =
         "Bölüm başlıklarının, çevresindeki metnin yüzdesi olarak boyutu.\n\n",
     ["Small capitals"] =
@@ -339,14 +379,24 @@ return {
         "Metin hizalaması",
     ["The familiar e-reader look: no indentation, a small gap between paragraphs, moderate spacing throughout."] =
         "Alışıldık e-okuyucu görünümü: girinti yok, paragraflar arasında küçük bir boşluk, her yerde ölçülü aralıklar.",
+    ["The preview could not be rendered on this device."] =
+        "Önizleme bu cihazda oluşturulamadı.",
+    ["The preview did not produce a page."] =
+        "Önizleme bir sayfa üretmedi.",
+    ["The preview failed."] =
+        "Önizleme başarısız oldu.",
     ["The settings people reach for most, on one screen. Can also be opened with a gesture."] =
         "En sık kullanılan ayarlar, tek ekranda. Bir hareketle de açılabilir.",
     ["The style you edit here is used for every book that has no style of its own."] =
         "Burada düzenlediğiniz stil, kendine ait bir stili olmayan her kitap için kullanılır.",
+    ["There is not enough free memory for a preview right now.\n\nA preview renders a second copy of the book in a separate process, which needs room. Closing other things, or reopening the book, usually frees enough."] =
+        "Şu anda önizleme için yeterli boş bellek yok.\n\nÖnizleme, kitabın ikinci bir kopyasını ayrı bir süreçte işler ve bunun için yere ihtiyaç duyar. Başka şeyleri kapatmak ya da kitabı yeniden açmak genellikle yeterince yer açar.",
     ["This book"] =
         "Bu kitap",
     ["This book only"] =
         "Yalnızca bu kitap",
+    ["This page has not been rendered yet."] =
+        "Bu sayfa henüz işlenmedi.",
     ["This plugin writes a small stylesheet and appends it after your style tweaks, so its settings win wherever the two overlap.\n\nAnything left at \"book default\" emits nothing at all, and leaves your tweaks and the publisher's styles untouched.\n\nEvery change re-renders the book. That is normal, and is what KOReader does for any style change."] =
         "\nBu eklenti küçük bir stil sayfası yazar ve onu stil ince ayarlarınızın sonuna ekler; bu yüzden ikisinin çakıştığı her yerde bu eklentinin ayarları üstün gelir.\n\n\"Kitap varsayılanı\"nda bırakılan hiçbir ayar için CSS üretilmez; ince ayarlarınız ve yayıncının stilleri olduğu gibi kalır.\n\nHer değişiklik kitabı yeniden işler. Bu normaldir; KOReader herhangi bir stil değişikliğinde aynısını yapar.",
     ["This replaces the style already stored at that level with the settings you are looking at now.\n\nContinue?"] =
@@ -357,6 +407,8 @@ return {
         "Üst kenar boşluğu",
     ["Traditional"] =
         "Geleneksel",
+    ["Try"] =
+        "Dene",
     ["Two numbers, and only the first one pushes words apart.\n\nScaling is the width of every space, as a percentage of the font's own space character. 100% is the font's natural width, and KOReader's default is 95% — slightly narrower. Go above 100% for wider gaps.\n\nReduction is how far justification may squeeze those spaces back to fit another word on the line. 100% forbids squeezing, so raise it as well or the wider gaps will not hold."] =
         "İki sayı var ve kelimeleri birbirinden ayıran yalnızca ilki.\n\nÖlçekleme, her boşluğun genişliğidir; yazı tipinin kendi boşluk karakterinin yüzdesi olarak. %100 yazı tipinin doğal genişliğidir ve KOReader'ın varsayılanı %95 — yani biraz daha dar. Boşlukları açmak için %100'ün üstüne çıkın.\n\nDaraltma ise iki yana yaslama sırasında bu boşlukların, satıra bir kelime daha sığdırmak için ne kadar geri sıkıştırılabileceğidir. %100 sıkıştırmayı tamamen yasaklar; bu yüzden onu da yükseltin, yoksa açtığınız boşluklar kalıcı olmaz.",
     ["Typography and hyphenation: %1"] =
@@ -403,4 +455,8 @@ return {
         "kapalı",
     ["on"] =
         "açık",
+    ["page %1 of %2"] =
+        "sayfa %1 / %2",
+    ["style changes"] =
+        "stil değişiklikleri",
 }

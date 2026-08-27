@@ -236,6 +236,10 @@ function Quick.show(plugin)
         state.torn_down = true
         plugin.defer_apply = false
         flush(state)
+        -- Under a preview, flush applied nothing: the sandbox swallowed it.
+        -- Telling the plugin lets the preview redraw itself with what was
+        -- changed here.
+        plugin:settingsScreenClosed()
     end
 
     state.alignText = function()
@@ -298,6 +302,24 @@ function Quick.show(plugin)
                 setButtonText(state, "align", state.alignText())
                 repaint(state)
                 flush(state)
+            end,
+        },
+        {
+            -- Deliberately does not flush: the whole point is to see these
+            -- changes without the book being re-rendered for them. The pending
+            -- values are handed to the preview's sandbox and dropped here, so
+            -- only one place is holding them — and closing this screen while a
+            -- preview is open cannot apply them behind the preview's back.
+            text = _("Try"),
+            enabled = not plugin:inSandbox(),
+            callback = function()
+                UIManager:unschedule(state.flush_callback)
+                local pending = {}
+                for key, value in pairs(state.pending_engine) do
+                    pending[key] = value
+                    state.pending_engine[key] = nil
+                end
+                plugin:showPreview{ engine = pending }
             end,
         },
         {

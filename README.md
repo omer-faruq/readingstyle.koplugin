@@ -110,6 +110,99 @@ immediately and the render happens once you stop tapping. **Apply changes
 immediately** can be switched off in the menu, which collects changes until you
 press *Apply now*.
 
+## Playground
+
+*Playground* (in the menu, and the *Try* button on the quick screen) opens the
+page you are on, drawn with the settings you have made, before anything happens
+to the book. It is a workbench rather than a confirmation dialog:
+
+- **Keep changing settings.** *Settings* opens this plugin's whole menu on top
+  of the preview. Everything you change there — including the quick screen, the
+  presets and the scope — is held, and the preview redraws itself with it. The
+  book is not touched.
+- **Turn pages.** ◀ ▶ (or a swipe, or the page-turn keys) move through the
+  book inside the preview, so you can check how the change lands around an
+  image or a chapter heading rather than only where you happen to be sitting.
+- **Then decide.** *Apply* puts everything you chose into the book in one go.
+  *Cancel* leaves it exactly as it was — the book was never re-rendered, so
+  there is nothing to undo.
+
+Two ways to look at a page:
+
+- **Full page** (the default) flips between before and after in the same
+  pixels. Side by side halves the width, and at half width a change in line
+  spacing, word spacing or indentation is no longer legible — which is most of
+  what this plugin does.
+- **Side by side** is there for the questions the flip is bad at: margins,
+  paragraph spacing, the room a chapter heading takes, whether an image still
+  fits its page. Tap a half to bring it up to full size.
+
+Both views draw a thin frame around the page. The image is scaled down to leave
+room for the title and the buttons, so without a line at its edge there is no
+telling where the page stops and the screen starts — and that is exactly what
+you are looking at when you are judging margins.
+
+The **⤢ button in the title bar**, or a long press on the page, hides the title
+and the buttons and shows the page at its real size. That is not just more
+room: with nothing else on the screen the image is displayed at exactly 1:1, so
+what you are looking at is what the book will be, pixel for pixel. A long press
+brings the controls back, and so does the back key.
+
+### How it can be safe
+
+The page is rendered by a short-lived forked subprocess, the same thing
+KOReader does for Book Map and Page Browser thumbnails. That process inherits
+the book already rendered with the style in force, so it draws the "before"
+images for free, applies the candidate style, re-renders once, and draws the
+"after" images at the same positions in the text. Then it dies, having touched
+nothing: not the rendering hash, not the book's saved settings, not crengine's
+cache.
+
+One fork covers a window of pages either side of where you are, which is why
+turning a page inside the preview is instant. Walking off the end of that
+window, or changing a setting, starts another one.
+
+Meanwhile the plugin itself is in a sandbox: style changes are not applied, and
+KOReader's own document settings are remembered instead of being driven into
+the document. That is the whole trick behind "change anything, nothing
+happens": there is nothing to undo on cancel, because nothing was ever set.
+
+### What it costs, and when it is refused
+
+The subprocess re-renders the whole book, which takes about as long as an
+*Apply* would — and, more to the point, needs the memory for it: KOReader's own
+background renderer measures a second render at around 60 MB for a big book.
+Every page image on top of that is another one to three megabytes.
+
+So the preview counts before it spends. It reads what the device has free,
+reserves room for the render, and sizes its window of pages from what is left —
+between one and four pages. If there is not even room for one, it says so
+instead of trying: a device that refuses a preview still works normally, and
+that is a much better outcome than taking the reader down with it.
+
+Two things follow from the same arithmetic:
+
+- **The window is small on small devices.** One render covers a window of
+  pages — one behind and up to four ahead, fewer when memory is tight or the
+  screen is large. Turning inside that window is instant; turning past its edge
+  starts another render, and costs the wait again.
+- **Pixels never become Lua strings.** Each image is written straight out of
+  one blitbuffer and read straight into another. Serializing them instead
+  costs four copies of every image, all of them garbage-collected — which on a
+  small device is exactly what runs it out of memory.
+
+Cancelling during the render kills the subprocess.
+
+### What it cannot hold
+
+Three settings in the menu are borrowed whole from other KOReader modules —
+**typography and hyphenation**, **header and footer**, and **this book's own
+style tweak**. They drive the live book directly and cannot be held back, so
+they are not offered from inside a preview.
+
+If the fork fails — or the book is not a crengine document — the menu item is
+simply not offered.
+
 ## What it cannot do
 
 Some honest limits, all of them inherent rather than unfinished:
@@ -119,8 +212,10 @@ Some honest limits, all of them inherent rather than unfinished:
   selector without knowing that book's markup.
 - **"First paragraph after a heading" needs the paragraph to be a direct
   sibling** of the heading. A wrapper element puts it out of reach.
-- **There is no preview.** Showing the change *is* re-rendering, so preview and
-  apply are the same operation.
+- **The live page cannot show a change without applying it.** In the open
+  document, showing the change *is* re-rendering it. The preview below gets
+  around this by drawing the page in a separate process, not by finding a way
+  to do it here.
 - **No entry in the bottom config bar.** Those options come from
   `frontend/ui/data/creoptions.lua`, which is fixed when the reader starts and
   has no plugin hook. The main menu and a gesture are the ways in.
@@ -144,12 +239,16 @@ user style tweaks folder, where it keeps working without the plugin.
 | `readingstyle_presets.lua` | The built-in profiles |
 | `readingstyle_menu.lua` | The menu tree |
 | `readingstyle_quick.lua` | The quick style screen |
-| `readingstyle_test.lua` | Tests for the three pure modules |
+| `readingstyle_sandbox.lua` | What a preview holds back, and what cancelling restores. Pure Lua |
+| `readingstyle_preview.lua` | The preview: the fork, and the pipe it talks over |
+| `readingstyle_preview_protocol.lua` | Record framing and preview arithmetic. Pure Lua |
+| `readingstyle_preview_view.lua` | The preview screen |
+| `readingstyle_test.lua` | Tests for the pure modules |
 | `readingstyle_gettext.lua` | Drop-in gettext replacement that reads `l10n/` |
 | `l10n/<code>.lua` | Translation tables |
 
-The settings, CSS and preset modules have no KOReader dependencies beyond
-gettext, so they run outside the reader:
+The settings, CSS, preset, sandbox and preview-protocol modules have no
+KOReader dependencies beyond gettext, so they run outside the reader:
 
 ```
 luajit plugins/readingstyle.koplugin/readingstyle_test.lua

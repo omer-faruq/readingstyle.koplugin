@@ -23,6 +23,8 @@ return {
         "À propos du style de lecture et des ajustements de style",
     ["Advanced"] =
         "Avancé",
+    ["After"] =
+        "Après",
     ["Align"] =
         "Align.",
     ["Aligning images turns them into blocks, which pulls inline images — drop caps, small icons inside a line of text — out of their line. Leave at book default unless you need it."] =
@@ -43,8 +45,12 @@ return {
         "Appliquer maintenant",
     ["Apply to: %1"] =
         "Appliquer à : %1",
+    ["Applying this will reload the book."] =
+        "Appliquer ceci rechargera le livre.",
     ["Avoid widows and orphans"] =
         "Éviter les veuves et les orphelines",
+    ["Before"] =
+        "Avant",
     ["Blank line between paragraphs, no indentation, generous line spacing and margins. Easy on tired eyes."] =
         "Ligne vide entre les paragraphes, aucun retrait, interligne et marges généreux. Reposant pour les yeux fatigués.",
     ["Block quotes"] =
@@ -61,6 +67,8 @@ return {
         "Livres dans cette langue",
     ["Bottom margin"] =
         "Marge inférieure",
+    ["Cancel"] =
+        "Annuler",
     ["Caps every image at the width and height of the page, so oversized images no longer spill past the margins."] =
         "Limite chaque image à la largeur et à la hauteur de la page, afin que les images trop grandes ne débordent plus des marges.",
     ["Centered"] =
@@ -111,6 +119,8 @@ return {
         "Supprime le style enregistré à ce niveau. La modification passe au niveau supérieur, dont le style prend le relais.",
     ["Do not indent the first line of the paragraph that follows a heading, which is the usual typographic convention.\n\nOnly reaches paragraphs that directly follow the heading. Books that wrap their chapter opening in a container are out of reach."] =
         "Ne pas renfoncer la première ligne du paragraphe qui suit un titre, comme le veut l'usage typographique.\n\nN'atteint que les paragraphes suivant directement le titre. Les livres qui enferment le début de chapitre dans un conteneur restent hors de portée.",
+    ["Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\n\nThe book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing."] =
+        "Dessine la page où vous êtes avec ces réglages dans un processus séparé, et vous la montre avant que quoi que ce soit n'arrive au livre.\n\nLe livre lui-même n'est pas recalculé et rien n'est enregistré tant que vous ne choisissez pas « Appliquer » ; regarder ne coûte donc rien.",
     ["E-reader"] =
         "Liseuse",
     ["Edit this book's own tweak"] =
@@ -135,6 +145,8 @@ return {
         "Force un saut de page avant chaque titre de chapitre, comme dans un livre imprimé.\n\nAvec H1 et H2, un sous-titre ne commence pas non plus une deuxième page à lui seul.",
     ["Force black text"] =
         "Forcer le texte en noir",
+    ["Full page"] =
+        "Page entière",
     ["H1 and H2"] =
         "H1 et H2",
     ["H1 only"] =
@@ -169,6 +181,8 @@ return {
         "En retrait et en italique",
     ["Ink and links"] =
         "Encre et liens",
+    ["Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it."] =
+        "Dans l'aperçu, vous pouvez continuer à modifier les réglages et à tourner les pages : tout ce que vous y changez est retenu jusqu'à ce que vous l'appliquiez.",
     ["Italic"] =
         "Italique",
     ["Justified"] =
@@ -211,6 +225,8 @@ return {
         "Aucun traitement particulier",
     ["Normal"] =
         "Normales",
+    ["Not available from inside a preview: that editor writes to the book itself, which a preview must not do."] =
+        "Non disponible depuis un aperçu : cet éditeur écrit dans le livre lui-même, ce qu'un aperçu ne doit pas faire.",
     ["Nothing is being generated: every setting is at book default."] =
         "Rien n'est généré : tous les réglages sont sur la valeur par défaut du livre.",
     ["On H1"] =
@@ -237,12 +253,24 @@ return {
         "Paragraphes",
     ["Plain controls for the settings that decide how a book looks — paragraph indentation and spacing, space around chapter titles, alignment, margins, images — with presets and per-book or per-language styles.\n\nBuilds on KOReader's style tweaks rather than replacing them: everything left at \"book default\" leaves your tweaks and the publisher's styles untouched."] =
         "Des réglages simples pour ce qui décide de l'aspect d'un livre — retrait et espacement des paragraphes, espace autour des titres de chapitre, alignement, marges, images — avec des préréglages et des styles par livre ou par langue.\n\nS'appuie sur les ajustements de style de KOReader au lieu de les remplacer : tout ce qui reste sur « par défaut du livre » laisse intacts vos ajustements et les styles de l'éditeur.",
+    ["Playground"] =
+        "Bac à sable",
     ["Presets"] =
         "Préréglages",
     ["Prettify"] =
         "Mettre en forme",
     ["Prevent images from overflowing the page"] =
         "Empêcher les images de déborder de la page",
+    ["Preview is not available for this book."] =
+        "L'aperçu n'est pas disponible pour ce livre.",
+    ["Preview is not available on this device."] =
+        "L'aperçu n'est pas disponible sur cet appareil.",
+    ["Preview: after"] =
+        "Aperçu : après",
+    ["Preview: before"] =
+        "Aperçu : avant",
+    ["Preview: before | after"] =
+        "Aperçu : avant | après",
     ["Printed-book typography: indented paragraphs with no gap between them, centred chapter titles with room above."] =
         "Typographie du livre imprimé : paragraphes renfoncés sans blanc entre eux, titres de chapitre centrés avec de l'espace au-dessus.",
     ["Publisher default"] =
@@ -263,6 +291,8 @@ return {
         "Supprime l'espace au-dessus du premier paragraphe suivant un titre, afin qu'il se place juste sous le titre de chapitre.",
     ["Removes every image from the page, for reading a heavily illustrated book as plain text.\n\nCaptions stay, since they are ordinary text."] =
         "Retire toutes les images de la page, pour lire un livre très illustré comme du texte seul.\n\nLes légendes restent, puisque ce sont des textes ordinaires.",
+    ["Rendering the book with the new style…\n\nThe book on screen is not being changed. This takes about as long as applying the style would."] =
+        "Rendu du livre avec le nouveau style…\n\nLe livre affiché n'est pas modifié. Cela prend à peu près le même temps que d'appliquer le style.",
     ["Replace"] =
         "Remplacer",
     ["Replaces italics with something else. Worth it when a book's italic face is thin or hard to read on screen."] =
@@ -307,8 +337,18 @@ return {
         "Enregistré dans %1\n\nApparaît sous Ajustements de style, dans les ajustements de l'utilisateur, après un redémarrage de KOReader.",
     ["Scaling"] =
         "Mise à l'échelle",
+    ["Settings"] =
+        "Réglages",
+    ["Show after"] =
+        "Afficher après",
+    ["Show before"] =
+        "Afficher avant",
     ["Shrinks footnote markers and the like, and stops them from stretching the line they sit on."] =
         "Réduit les appels de note et similaires, et les empêche d'étirer la ligne où ils se trouvent.",
+    ["Side by side"] =
+        "Côte à côte",
+    ["Side margins"] =
+        "Marges latérales",
     ["Size of chapter titles, as a percentage of the surrounding text.\n\n"] =
         "Taille des titres de chapitre, en pourcentage du texte environnant.\n\n",
     ["Small capitals"] =
@@ -339,14 +379,24 @@ return {
         "Alignement du texte",
     ["The familiar e-reader look: no indentation, a small gap between paragraphs, moderate spacing throughout."] =
         "L'aspect familier des liseuses : aucun retrait, un petit blanc entre les paragraphes, des espacements modérés partout.",
+    ["The preview could not be rendered on this device."] =
+        "L'aperçu n'a pas pu être rendu sur cet appareil.",
+    ["The preview did not produce a page."] =
+        "L'aperçu n'a produit aucune page.",
+    ["The preview failed."] =
+        "L'aperçu a échoué.",
     ["The settings people reach for most, on one screen. Can also be opened with a gesture."] =
         "Les réglages les plus utilisés, sur un seul écran. Peut aussi s'ouvrir par un geste.",
     ["The style you edit here is used for every book that has no style of its own."] =
         "Le style modifié ici s'applique à tout livre qui n'a pas de style propre.",
+    ["There is not enough free memory for a preview right now.\n\nA preview renders a second copy of the book in a separate process, which needs room. Closing other things, or reopening the book, usually frees enough."] =
+        "Il n'y a pas assez de mémoire libre pour un aperçu en ce moment.\n\nUn aperçu effectue le rendu d'une deuxième copie du livre dans un processus séparé, ce qui demande de la place. Fermer d'autres choses, ou rouvrir le livre, en libère généralement assez.",
     ["This book"] =
         "Ce livre",
     ["This book only"] =
         "Ce livre uniquement",
+    ["This page has not been rendered yet."] =
+        "Cette page n'a pas encore été rendue.",
     ["This plugin writes a small stylesheet and appends it after your style tweaks, so its settings win wherever the two overlap.\n\nAnything left at \"book default\" emits nothing at all, and leaves your tweaks and the publisher's styles untouched.\n\nEvery change re-renders the book. That is normal, and is what KOReader does for any style change."] =
         "Cette extension écrit une petite feuille de style et l'ajoute après vos ajustements de style : ses réglages l'emportent donc partout où les deux se recoupent.\n\nTout ce qui reste sur « par défaut du livre » ne produit rien du tout et laisse intacts vos ajustements et les styles de l'éditeur.\n\nChaque changement provoque un nouveau rendu du livre. C'est normal : KOReader fait de même pour tout changement de style.",
     ["This replaces the style already stored at that level with the settings you are looking at now.\n\nContinue?"] =
@@ -357,6 +407,8 @@ return {
         "Marge supérieure",
     ["Traditional"] =
         "Traditionnel",
+    ["Try"] =
+        "Essayer",
     ["Two numbers, and only the first one pushes words apart.\n\nScaling is the width of every space, as a percentage of the font's own space character. 100% is the font's natural width, and KOReader's default is 95% — slightly narrower. Go above 100% for wider gaps.\n\nReduction is how far justification may squeeze those spaces back to fit another word on the line. 100% forbids squeezing, so raise it as well or the wider gaps will not hold."] =
         "Deux nombres, et seul le premier écarte les mots.\n\nLa mise à l'échelle est la largeur de chaque espace, en pourcentage de l'espace propre à la police. 100 % correspond à la largeur naturelle, et la valeur par défaut de KOReader est 95 % — un peu plus étroite. Dépassez 100 % pour des blancs plus larges.\n\nLa réduction indique jusqu'où la justification peut resserrer ces espaces pour faire tenir un mot de plus sur la ligne. 100 % interdit tout resserrement : augmentez-la aussi, sinon les blancs élargis ne tiendront pas.",
     ["Typography and hyphenation: %1"] =
@@ -403,4 +455,8 @@ return {
         "désactivé",
     ["on"] =
         "activé",
+    ["page %1 of %2"] =
+        "page %1 sur %2",
+    ["style changes"] =
+        "modifications de style",
 }

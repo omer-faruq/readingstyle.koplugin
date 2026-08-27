@@ -1,4 +1,4 @@
--- 196 unique strings
+-- 224 unique strings
 return {
     ["Reading style"] = "Reading style",
     ["Plain controls for the settings that decide how a book looks — paragraph indentation and spacing, space around chapter titles, alignment, margins, images — with presets and per-book or per-language styles.\
@@ -10,6 +10,8 @@ Builds on KOReader's style tweaks rather than replacing them: everything left at
     ["Publisher default"] = "Publisher default",
     ["Custom (%1)"] = "Custom (%1)",
     ["Reset"] = "Reset",
+    ["Preview is not available on this device."] = "Preview is not available on this device.",
+    ["Preview is not available for this book."] = "Preview is not available for this book.",
     ["Save current reading style as preset"] = "Save current reading style as preset",
     ["Load reading style preset"] = "Load reading style preset",
     ["Cycle reading style presets"] = "Cycle reading style presets",
@@ -215,6 +217,7 @@ It appears under Style tweaks, in User style tweaks, once KOReader is restarted.
     ["Could not write the file: %1"] = "Could not write the file: %1",
     ["Edit this book's own tweak"] = "Edit this book's own tweak",
     ["Opens KOReader's book-specific style tweak editor, with its CSS suggestions and prettifier. That tweak is stored by KOReader, separately from this plugin, and applies before these settings."] = "Opens KOReader's book-specific style tweak editor, with its CSS suggestions and prettifier. That tweak is stored by KOReader, separately from this plugin, and applies before these settings.",
+    ["Not available from inside a preview: that editor writes to the book itself, which a preview must not do."] = "Not available from inside a preview: that editor writes to the book itself, which a preview must not do.",
     ["About reading style and style tweaks"] = "About reading style and style tweaks",
     ["This plugin writes a small stylesheet and appends it after your style tweaks, so its settings win wherever the two overlap.\
 \
@@ -266,6 +269,13 @@ Switching between these three only changes which one you are editing and which o
     ["Delete the style for this language"] = "Delete the style for this language",
     ["Quick style"] = "Quick style",
     ["The settings people reach for most, on one screen. Can also be opened with a gesture."] = "The settings people reach for most, on one screen. Can also be opened with a gesture.",
+    ["Playground"] = "Playground",
+    ["Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\
+\
+The book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing."] = "Draws the page you are on with these settings in a separate process, and shows it to you before anything happens to the book.\
+\
+The book itself is not re-rendered and nothing is saved unless you choose \"Apply\" there, so looking costs nothing.",
+    ["Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it."] = "Inside the preview you can go on changing settings and turning pages: everything you change there is held until you apply it.",
     ["Apply changes immediately"] = "Apply changes immediately",
     ["On, changes appear as soon as you make them. Off, they are collected and only applied when you choose \"Apply now\".\
 \
@@ -279,6 +289,15 @@ Each apply re-renders the book, so turning this off is worth it when you are cha
 Styles stored at the other levels are not touched; deleting those is a separate action."] = "Puts everything this menu marks as changed back to default, at the level you are editing: this plugin's settings return to book default, and KOReader's own — line spacing, word spacing, font weight, margins — return to theirs.\
 \
 Styles stored at the other levels are not touched; deleting those is a separate action.",
+    ["Indent"] = "Indent",
+    ["Spacing"] = "Spacing",
+    ["Chapter"] = "Chapter",
+    ["Line"] = "Line",
+    ["Align"] = "Align",
+    ["Lang: %1"] = "Lang: %1",
+    ["Try"] = "Try",
+    ["Apply"] = "Apply",
+    ["Close"] = "Close",
     ["Clears every reading style setting and lets the book look the way its publisher intended."] = "Clears every reading style setting and lets the book look the way its publisher intended.",
     ["Compact"] = "Compact",
     ["Tight lines and small margins, no space between paragraphs. Fits the most text on a page."] = "Tight lines and small margins, no space between paragraphs. Fits the most text on a page.",
@@ -288,12 +307,33 @@ Styles stored at the other levels are not touched; deleting those is a separate 
     ["Blank line between paragraphs, no indentation, generous line spacing and margins. Easy on tired eyes."] = "Blank line between paragraphs, no indentation, generous line spacing and margins. Easy on tired eyes.",
     ["E-reader"] = "E-reader",
     ["The familiar e-reader look: no indentation, a small gap between paragraphs, moderate spacing throughout."] = "The familiar e-reader look: no indentation, a small gap between paragraphs, moderate spacing throughout.",
-    ["Indent"] = "Indent",
-    ["Spacing"] = "Spacing",
-    ["Chapter"] = "Chapter",
-    ["Line"] = "Line",
-    ["Align"] = "Align",
-    ["Lang: %1"] = "Lang: %1",
-    ["Apply"] = "Apply",
-    ["Close"] = "Close",
+    ["The preview did not produce a page."] = "The preview did not produce a page.",
+    ["There is not enough free memory for a preview right now.\
+\
+A preview renders a second copy of the book in a separate process, which needs room. Closing other things, or reopening the book, usually frees enough."] = "There is not enough free memory for a preview right now.\
+\
+A preview renders a second copy of the book in a separate process, which needs room. Closing other things, or reopening the book, usually frees enough.",
+    ["The preview could not be rendered on this device."] = "The preview could not be rendered on this device.",
+    ["Preview: before | after"] = "Preview: before | after",
+    ["Preview: after"] = "Preview: after",
+    ["Preview: before"] = "Preview: before",
+    ["page %1 of %2"] = "page %1 of %2",
+    ["The preview failed."] = "The preview failed.",
+    ["Rendering the book with the new style…\
+\
+The book on screen is not being changed. This takes about as long as applying the style would."] = "Rendering the book with the new style…\
+\
+The book on screen is not being changed. This takes about as long as applying the style would.",
+    ["Before"] = "Before",
+    ["After"] = "After",
+    ["This page has not been rendered yet."] = "This page has not been rendered yet.",
+    ["Cancel"] = "Cancel",
+    ["Show before"] = "Show before",
+    ["Show after"] = "Show after",
+    ["Side by side"] = "Side by side",
+    ["Full page"] = "Full page",
+    ["Settings"] = "Settings",
+    ["Applying this will reload the book."] = "Applying this will reload the book.",
+    ["Side margins"] = "Side margins",
+    ["style changes"] = "style changes",
 }
