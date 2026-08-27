@@ -69,6 +69,7 @@ local UIManager = require("ui/uimanager")
 local ffi = require("ffi")
 local ffiutil = require("ffi/util")
 local logger = require("logger")
+local time = require("ui/time")
 local util = require("util")
 local Screen = Device.screen
 
@@ -82,7 +83,14 @@ local Preview = {}
 -- the reader should get their screen back.
 Preview.TIMEOUT = 180
 
-Preview.POLL_INTERVAL = 0.1
+--- How often the parent looks at the pipe when it is between images. Inside an
+-- image it does not wait for a tick at all; see Session:_drainImage.
+Preview.POLL_INTERVAL = 0.05
+
+--- How long to keep waiting for the rest of an image that has started
+-- arriving, before handing control back to the reader. Only ever reached when
+-- something has gone wrong: the child writes an image's pixels in one go.
+Preview.IMAGE_WAIT = 1
 
 -- Subprocess side -----------------------------------------------------------
 
@@ -150,6 +158,15 @@ local function renderInSubProcess(context, write_fd)
     local document = ui.document
     local codec = context.codec
 
+    -- Timings, because "the preview is slow" has several possible causes that
+    -- cannot be told apart from the outside: the render, the drawing of the
+    -- pages, or moving the images through the pipe. Cheap enough to leave in —
+    -- a handful of lines per preview, greppable as "ReadingStyle preview".
+    local started = time.now()
+    local function since(mark)
+        return string.format("%.3fs", time.to_s(time.since(mark)))
+    end
+
     local function send(record)
         local ok, payload = pcall(codec.serialize, record)
         if not ok then
@@ -160,13 +177,41 @@ local function renderInSubProcess(context, write_fd)
         return writeAll(write_fd, framed, #framed)
     end
 
+    -- runInSubProcess nices its children to +5 and puts them on SCHED_BATCH,
+    -- which is right for a background thumbnail and wrong here: a reader is
+    -- sitting in front of this one waiting for it. Back to normal priority.
+    pcall(function() ffi.C.setpriority(ffi.C.PRIO_PROCESS, 0, 0) end)
+
     -- 1. Limit our impact on everything the parent still owns.
     ui.saveSettings = function() end
     ui.statistics = nil
     if ui.highlight then ui.highlight.select_mode = false end
     if ui.rolling then ui.rolling.rendering_state = nil end
     document:setCallback()
-    document:enablePartialRerendering(false)
+
+    -- Why a style change appears instantly in the book but a preview used to
+    -- take seconds: crengine can re-render only the current chapter instead of
+    -- the whole document ("text appearance adjustments can be made quicker by
+    -- only rendering the current chapter", readerrolling.lua:472-475), and that
+    -- is what the reader does by default. This used to force a full render,
+    -- which is the honest thing to draw but pays for the entire book to see one
+    -- page of it.
+    --
+    -- The state it leaves behind is degraded — page numbers, ToC, footer info —
+    -- which is why the reader has to schedule a full re-render afterwards. Here
+    -- it costs nothing: the process dies with the page it drew.
+    local partial = document:canBePartiallyRerendered() == true
+    logger.dbg("ReadingStyle preview: partial rerendering available:", partial)
+    if partial then
+        document:enablePartialRerendering(true)
+        -- ReaderView calls this after crengine draws, to notice a partial
+        -- rerendering happened. crengine does the rendering itself; this only
+        -- keeps the reader's own bookkeeping straight, and its repositioning
+        -- would drag every page in the window back to the reading position.
+        ui.rolling.handlePartialRerendering = function() return false end
+    else
+        document:enablePartialRerendering(false)
+    end
     if ui.view.view_mode == "scroll" then
         -- Same order as ReaderThumbnail uses, to avoid a rendering hash change:
         -- one page first, then out of scroll mode.
@@ -176,9 +221,15 @@ local function renderInSubProcess(context, write_fd)
 
     local bb_type = document.render_color and document.color_bb_type or Blitbuffer.TYPE_BB8
 
-    local function drawAt(xpointer)
+    local function drawAt(xpointer, log_as)
+        local draw_mark = time.now()
         if xpointer then
             document:gotoXPointer(xpointer)
+            -- The page crengine should hold on to while it renders: with
+            -- partial rerendering it repositions on the top xpointer of the
+            -- page being shown, and this is that page, not where the reader
+            -- happens to be sitting.
+            ui.rolling.xpointer = xpointer
         end
         local page = document:getCurrentPage()
         ui.view.state.page = page
@@ -186,11 +237,16 @@ local function renderInSubProcess(context, write_fd)
         if ui.pagemap then pcall(ui.pagemap.onPageUpdate, ui.pagemap, page) end
         local bb = Blitbuffer.new(context.width, context.height, bb_type)
         ui.view:paintTo(bb, 0, 0)
+        if log_as then
+            logger.dbg("ReadingStyle preview:", log_as, "page", page,
+                "drawn in", since(draw_mark))
+        end
         return bb
     end
 
     --- The record, then the pixels. Nothing in between, and no copy of either.
-    local function sendImage(kind, index, page, bb)
+    local function sendImage(kind, index, page, bb, log_as)
+        local send_mark = time.now()
         local stride = tonumber(bb.stride)
         send{
             kind = kind,
@@ -205,6 +261,12 @@ local function renderInSubProcess(context, write_fd)
             bytes = stride * bb.h,
         }
         writeAll(write_fd, bb.data, stride * bb.h)
+        if log_as then
+            -- Drawing and moving the image are different problems with
+            -- different fixes; the first page says which one is biting.
+            logger.dbg("ReadingStyle preview:", log_as, "page", page,
+                "sent in", since(send_mark))
+        end
     end
 
     -- 2. The window this batch covers, worked out in the render the book is
@@ -238,12 +300,31 @@ local function renderInSubProcess(context, write_fd)
         page_count = page_count,
         origin_index = origin_index,
     }
+    logger.dbg("ReadingStyle preview: window of", #positions, "pages ready in", since(started))
 
-    -- 3. "Before": the inherited render, so no rendering is needed for these.
-    for index, position in ipairs(positions) do
-        local bb = drawAt(position.xpointer)
-        sendImage("before", index, position.page, bb)
+    -- 3. "Before", for the page the reader is on and no other.
+    --
+    -- These have to be drawn before the candidate goes in, because the
+    -- inherited render *is* the before state — which means every one of them
+    -- sits between the reader and the thing they actually asked to see. One is
+    -- what the flip needs. The rest were page draws nobody was waiting for, and
+    -- they are also what made a position cost two images instead of one.
+    local before_mark = time.now()
+    local origin = positions[origin_index]
+    if origin then
+        local bb = drawAt(origin.xpointer, "before")
+        sendImage("before", origin_index, origin.page, bb, "before")
         bb:free()
+    end
+    logger.dbg("ReadingStyle preview: before pass", since(before_mark))
+
+    -- A fetch of one "before" image and nothing else: the reader asked to
+    -- compare a page the batch drew with the candidate style only. No candidate
+    -- goes in and nothing is re-rendered — the state this process inherited is
+    -- already the answer, which is what makes this affordable on demand.
+    if context.only == "before" then
+        send{ kind = "meta", dom_stale = false }
+        return
     end
 
     -- 4. The candidate. preview_css is read by ReadingStyle:getCss(), so the
@@ -256,14 +337,47 @@ local function renderInSubProcess(context, write_fd)
     end
     applyEngineValues(ui, context.engine)
     document:setStyleSheet(ui.typeset.css, ui.styletweak:getCssText())
-    document._document:renderDocument()
+
+    -- ReaderRolling calls this before repositioning, with the comment "Calling
+    -- this now ensures the re-rendering is done by crengine" (:1010-1013). It
+    -- is also how we find out which way crengine went: a delayed rerendering
+    -- means it took the partial path and each page will be rendered as it is
+    -- drawn. Anything else, and we ask for the full render ourselves rather
+    -- than risk drawing the old style.
+    local render_mark = time.now()
+    document:getCurrentPos()
+    local delayed = partial and document:isRerenderingDelayed()
+    if not delayed then
+        document._document:renderDocument()
+    end
+    local render_took, render_kind = since(render_mark),
+        delayed and "partial" or "full"
+    logger.dbg("ReadingStyle preview: candidate rendered in", render_took, render_kind)
 
     -- 5. "After": the same positions, found again in the new render.
-    for index, position in ipairs(positions) do
-        local bb = drawAt(position.xpointer)
-        sendImage("after", index, position.page, bb)
-        bb:free()
+    local after_mark = time.now()
+    -- The page being looked at first, then its neighbours: the reader is
+    -- waiting for one of these and it is not the top of the window.
+    local order = { origin_index }
+    for index = 1, #positions do
+        if index ~= origin_index then
+            order[#order + 1] = index
+        end
     end
+    for step, index in ipairs(order) do
+        local position = positions[index]
+        local first = step == 1
+        local bb = drawAt(position.xpointer, first and "after" or nil)
+        sendImage("after", index, position.page, bb, first and "after" or nil)
+        bb:free()
+        if first then
+            -- One line per preview, and the one worth having: how long the
+            -- reader waited, and which of the two renders they paid for.
+            logger.info("ReadingStyle preview: page ready in", since(started),
+                "(" .. render_kind, "render", render_took .. ")")
+        end
+    end
+    logger.dbg("ReadingStyle preview: after pass", since(after_mark))
 
     send{
         kind = "meta",
@@ -335,6 +449,7 @@ end
 --   css       optional candidate CSS; nil means "whatever getCss() says now"
 --   origin_xpointer  where the batch is centred; defaults to the reading position
 --   origin_offset    pages to step from there before centring (page turns)
+--   only             "before" to draw just that one image and stop
 --   back, forward    how many pages either side; capped by what memory allows
 --   width, height    image size; defaults to the screen
 --   on_batch(positions, page_count, origin_index)  the window, before any image
@@ -350,6 +465,7 @@ function Preview.start(opts)
         on_error = opts.on_error,
         images = {},
         stage = "header",
+        started_time = time.now(),
         header = "",
         payload = "",
         started_at = os.time(),
@@ -376,6 +492,7 @@ function Preview.start(opts)
         codec = Persist.getCodec("luajit"),
         origin_xpointer = opts.origin_xpointer or Preview.currentXPointer(plugin),
         origin_offset = opts.origin_offset,
+        only = opts.only,
         back = back,
         forward = forward,
         engine = opts.engine or {},
@@ -396,7 +513,11 @@ function Preview.start(opts)
 
     -- The child inherits this heap. Collecting first means it starts from a
     -- compact one, and leaves the parent room for the images about to arrive.
-    collectgarbage("collect")
+    -- Skipped for a single-image fetch: there the collection would cost as much
+    -- as the work, and there is one image coming, not a window of them.
+    if not opts.only then
+        collectgarbage("collect")
+    end
 
     local pid, read_fd = ffiutil.runInSubProcess(function(_child_pid, child_write_fd)
         local ok, err = pcall(renderInSubProcess, context, child_write_fd)
@@ -489,6 +610,35 @@ function Session:_beginImage(record)
     return true
 end
 
+--- Fills the image being received, waiting on the pipe rather than on the next
+-- scheduler tick.
+--
+-- This is where a preview's time was going. The child writes an image's pixels
+-- in one go, immediately after its record, so once the record has arrived the
+-- bytes are already on their way — the pipe holding only 64 KB is the sole
+-- reason they arrive in pieces. Going back to the scheduler between those
+-- pieces cost a poll interval each: at 64 KB a tick, a 1.5 MB page took four
+-- seconds to cross, and a batch of twelve took most of a minute. Waiting the
+-- microseconds it actually takes instead turns that into one memcpy.
+--
+-- Returns whether the image is complete, and whether anything was read at all.
+function Session:_drainImage()
+    local incoming = self.incoming
+    local started_at = time.now()
+    local offset_before = incoming.offset
+    while incoming.remaining > 0 do
+        local read = self:_readPixels()
+        if read < 0 then break end
+        if read == 0 then
+            if time.since(started_at) > time.s(Preview.IMAGE_WAIT) then break end
+            -- The child is mid-write, not thinking: this is a pause of
+            -- microseconds, and the sleep is only here to not spin a core.
+            ffiutil.usleep(1000)
+        end
+    end
+    return incoming.remaining == 0, incoming.offset > offset_before
+end
+
 function Session:_handleRecord(payload)
     local ok, record = pcall(self.codec.deserialize, payload)
     if not ok or type(record) ~= "table" then
@@ -524,6 +674,11 @@ function Session:_finishImage()
     self.incoming = nil
     self.stage = "header"
     self.header = ""
+    if incoming.kind == "after" and not self.first_after_logged then
+        self.first_after_logged = true
+        logger.dbg("ReadingStyle preview: first page on screen after",
+            string.format("%.3fs", time.to_s(time.since(self.started_time))))
+    end
     if self.on_image then
         self.on_image(incoming.kind, incoming.index, incoming.bb, incoming.page)
     end
@@ -565,12 +720,10 @@ function Session:_poll()
                 self:_handleRecord(payload)
             end
         else
-            local read = self:_readPixels()
-            if read <= 0 then break end
-            progressed = true
-            if self.incoming.remaining == 0 then
-                self:_finishImage()
-            end
+            local completed, moved = self:_drainImage()
+            if moved then progressed = true end
+            if not completed then break end
+            self:_finishImage()
         end
     end
     if self.finished then return end

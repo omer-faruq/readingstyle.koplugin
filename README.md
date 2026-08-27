@@ -127,7 +127,7 @@ to the book. It is a workbench rather than a confirmation dialog:
   *Cancel* leaves it exactly as it was — the book was never re-rendered, so
   there is nothing to undo.
 
-Two ways to look at a page:
+Two ways to look at the page you opened it from:
 
 - **Full page** (the default) flips between before and after in the same
   pixels. Side by side halves the width, and at half width a change in line
@@ -136,6 +136,18 @@ Two ways to look at a page:
 - **Side by side** is there for the questions the flip is bad at: margins,
   paragraph spacing, the room a chapter heading takes, whether an image still
   fits its page. Tap a half to bring it up to full size.
+
+The other pages in the window are drawn with the new style only. *Show before*
+and *Side by side* still work there: either one draws that page as it is now
+first, which takes a moment and needs no rendering at all — the subprocess
+inherits the book exactly as it stands. Turning a page while you are looking at
+*before*, or at both halves, keeps you there: the page you turn to is drawn
+that way too, rather than quietly reverting to the new style and labelling it
+as though nothing had changed.
+
+Drawing every page both ways up front is what a preview cannot afford, since it
+doubles both the wait and the memory for a comparison that is mostly wanted
+where you are standing. One fetched image is kept at a time.
 
 Both views draw a thin frame around the page. The image is scaled down to leave
 room for the title and the buttons, so without a line at its edge there is no
@@ -152,11 +164,11 @@ brings the controls back, and so does the back key.
 
 The page is rendered by a short-lived forked subprocess, the same thing
 KOReader does for Book Map and Page Browser thumbnails. That process inherits
-the book already rendered with the style in force, so it draws the "before"
-images for free, applies the candidate style, re-renders once, and draws the
-"after" images at the same positions in the text. Then it dies, having touched
-nothing: not the rendering hash, not the book's saved settings, not crengine's
-cache.
+the book already rendered with the style in force, so the "before" image costs
+it nothing — it draws that one first, then applies the candidate style,
+re-renders, and draws the pages of the window at the same positions in the
+text. Then it dies, having touched nothing: not the rendering hash, not the
+book's saved settings, not crengine's cache.
 
 One fork covers a window of pages either side of where you are, which is why
 turning a page inside the preview is instant. Walking off the end of that
@@ -169,10 +181,17 @@ happens": there is nothing to undo on cancel, because nothing was ever set.
 
 ### What it costs, and when it is refused
 
-The subprocess re-renders the whole book, which takes about as long as an
-*Apply* would — and, more to the point, needs the memory for it: KOReader's own
-background renderer measures a second render at around 60 MB for a big book.
-Every page image on top of that is another one to three megabytes.
+Rendering is not the wait. On an EPUB with multiple fragments the subprocess
+takes the same shortcut the reader itself takes when you apply a change —
+rendering only the chapter you are in — and that is measured in milliseconds.
+What costs time is drawing each page and moving it across: a page image is one
+to three megabytes and there are as many of them as the window is wide. So the
+page you are on is drawn and sent first, and it is the only one drawn twice.
+
+Memory is the other half of it, and the reason the playground counts before it
+spends: KOReader's own background renderer measures a second render of a big
+book at around 60 MB, and every page image on top of that is another one to
+three megabytes.
 
 So the preview counts before it spends. It reads what the device has free,
 reserves room for the render, and sizes its window of pages from what is left —
@@ -185,7 +204,7 @@ Two things follow from the same arithmetic:
 - **The window is small on small devices.** One render covers a window of
   pages — one behind and up to four ahead, fewer when memory is tight or the
   screen is large. Turning inside that window is instant; turning past its edge
-  starts another render, and costs the wait again.
+  starts another render, and costs that wait again.
 - **Pixels never become Lua strings.** Each image is written straight out of
   one blitbuffer and read straight into another. Serializing them instead
   costs four copies of every image, all of them garbage-collected — which on a

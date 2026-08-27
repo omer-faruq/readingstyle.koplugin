@@ -521,18 +521,19 @@ check("window: nothing left after the render reserve is a refusal", (function()
 end)())
 
 check("window: one page fits, so one page it is", (function()
-    -- A position costs two images, one per side.
+    -- A position costs one image, plus one for the "before" of the page the
+    -- reader started on.
     local back, forward = Protocol.windowFor(RESERVE + 2 * IMAGE, IMAGE, RESERVE)
     return back == 0 and forward == 0
 end)())
 
 check("window: it grows with what is free, and stops growing", (function()
     local cases = {
-        { free = RESERVE + 4 * IMAGE,   back = 0, forward = 1 },
-        { free = RESERVE + 6 * IMAGE,   back = 1, forward = 1 },
-        { free = RESERVE + 8 * IMAGE,   back = 1, forward = 2 },
-        { free = RESERVE + 10 * IMAGE,  back = 1, forward = 3 },
-        { free = RESERVE + 12 * IMAGE,  back = 1, forward = 4 },
+        { free = RESERVE + 3 * IMAGE,   back = 0, forward = 1 },
+        { free = RESERVE + 4 * IMAGE,   back = 1, forward = 1 },
+        { free = RESERVE + 5 * IMAGE,   back = 1, forward = 2 },
+        { free = RESERVE + 6 * IMAGE,   back = 1, forward = 3 },
+        { free = RESERVE + 7 * IMAGE,   back = 1, forward = 4 },
         -- Capped: a roomy device does not get an ever-growing window.
         { free = RESERVE + 400 * IMAGE, back = 1, forward = 4 },
     }
@@ -549,7 +550,7 @@ end)())
 check("window: it always leans forward", (function()
     -- Every window with room for more than two pages keeps exactly one page of
     -- context behind and spends the rest ahead, which is where reading goes.
-    for images = 6, 40, 2 do
+    for images = 4, 40, 2 do
         local back, forward = Protocol.windowFor(RESERVE + images * IMAGE, IMAGE, RESERVE)
         if back ~= 1 or forward < 1 or forward > back + forward then
             return false, string.format("%d images -> %s,%s", images, tostring(back), tostring(forward))
@@ -559,9 +560,12 @@ check("window: it always leans forward", (function()
 end)())
 
 check("window: a bigger screen buys fewer pages", (function()
-    local free = RESERVE + 8 * IMAGE
+    local free = RESERVE + 12 * IMAGE
     local small_back, small_forward = Protocol.windowFor(free, IMAGE, RESERVE)
     local large_back, large_forward = Protocol.windowFor(free, 4 * IMAGE, RESERVE)
+    if not small_back or not large_back then
+        return false, "one of them refused outright"
+    end
     return small_back + small_forward > large_back + large_forward
 end)())
 

@@ -80,8 +80,9 @@ Protocol.MAX_POSITIONS = 6
 -- The subprocess re-renders the whole book, which is where the memory goes:
 -- KOReader's own background renderer measures that at around 60 MB for a big
 -- book (readerrolling.lua:1926-1930). Whatever is left after reserving room for
--- that is what the images may use, and each position in the window costs two of
--- them — one per side.
+-- that is what the images may use. Each position in the window costs one image,
+-- plus one more for the single "before" image the flip needs on the page the
+-- reader started from.
 --
 -- The re-render is paid once per batch, so every page inside the window is a
 -- free page turn and every page past it costs seconds. That is why the window
@@ -98,7 +99,7 @@ function Protocol.windowFor(free_bytes, image_bytes, reserve_bytes)
     end
     reserve_bytes = reserve_bytes or Protocol.RENDER_RESERVE
     local budget = free_bytes - reserve_bytes
-    local positions = floor(budget / (2 * image_bytes))
+    local positions = floor((budget - image_bytes) / image_bytes)
     if positions < 1 then return nil end
     if positions > Protocol.MAX_POSITIONS then
         positions = Protocol.MAX_POSITIONS

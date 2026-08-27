@@ -130,6 +130,8 @@ function PreviewView:_render(opts)
         self.session:freeImages()
         self.session = nil
     end
+    self:_dropFetchedBefore()
+    self.batch_done = false
 
     self.session = Preview.start{
         plugin = self.plugin,
@@ -162,6 +164,9 @@ function PreviewView:_render(opts)
         end,
         on_done = function(meta)
             self.meta = meta
+            self.batch_done = true
+            -- A new batch: the page it landed on may need the other half too.
+            UIManager:nextTick(function() self:_ensureWantedView() end)
             if self.state == "loading" then
                 self.state = "error"
                 self.error_message = _("The preview did not produce a page.")
@@ -182,6 +187,81 @@ function PreviewView:_render(opts)
             self:_rebuild()
         end,
     }
+end
+
+--- Draws the "before" image for the page being looked at, which the batch drew
+-- with the candidate style only.
+--
+-- Cheap, and worth doing on demand rather than up front: the subprocess
+-- inherits the book exactly as it is, which is the "before" state, so this
+-- costs one page draw and no rendering at all. Drawing one for every page in
+-- the window would double both the wait and the memory, for a comparison that
+-- is mostly wanted where the reader is standing.
+-- then_view says what the image was asked for: "split" to put the two halves
+-- side by side once it lands, anything else to flip to it.
+function PreviewView:_fetchBefore(then_view)
+    if self.fetching_before or self.closing then return end
+    local index = self.index
+    local position = self.positions[index]
+    if not position or not position.xpointer or position.before then return end
+
+    -- One fetched image is kept at a time. It is a here-and-now comparison, and
+    -- each one is another screen-sized image the window's budget did not plan
+    -- for; the reader who walks six pages should not end up holding six.
+    self:_dropFetchedBefore()
+
+    -- Deliberately no repaint here. The screen is showing the right thing
+    -- already — the page as it is with the candidate style — and on e-ink a
+    -- repaint is a full refresh, which costs more than the whole fetch. The
+    -- image landing repaints once, and that is the one worth having.
+    self.fetching_before = true
+
+    local session = Preview.start{
+        plugin = self.plugin,
+        origin_xpointer = position.xpointer,
+        back = 0,
+        forward = 0,
+        only = "before",
+        on_image = function(kind, _index, bb)
+            local target = self.positions[index]
+            if target and kind == "before" then
+                target.before = bb
+            end
+        end,
+        on_done = function()
+            self.fetching_before = false
+            if self.positions[index] and self.positions[index].before then
+                if then_view == "split" then
+                    self.mode = "split"
+                else
+                    self.side = "before"
+                end
+            end
+            self:_rebuild()
+        end,
+        on_error = function(message)
+            logger.warn("ReadingStyle preview: before image failed:", message)
+            self.fetching_before = false
+            self:_rebuild()
+        end,
+    }
+    self.fetched_before = { index = index, session = session }
+    return true
+end
+
+--- Forgets the one fetched "before" image, image and all. The page it belonged
+-- to goes back to having only its candidate render, which is what the batch
+-- gave it.
+function PreviewView:_dropFetchedBefore()
+    local fetched = self.fetched_before
+    if not fetched then return end
+    self.fetched_before = nil
+    local position = self.positions[fetched.index]
+    if position then
+        position.before = nil
+    end
+    fetched.session:cancel()
+    fetched.session:freeImages()
 end
 
 --- A settings screen has closed over the preview. If anything changed, the
@@ -222,10 +302,10 @@ function PreviewView:_titleText()
         return _("Playground")
     end
     local what
-    if self.mode == "split" then
+    if self:_displayedMode() == "split" then
         what = _("Preview: before | after")
     else
-        what = self.side == "after" and _("Preview: after") or _("Preview: before")
+        what = self:_displayedSide() == "after" and _("Preview: after") or _("Preview: before")
     end
     local page = self:_currentPosition().page
     if page and self.page_count then
@@ -332,7 +412,7 @@ function PreviewView:_content(height)
     end
 
     local position = self:_currentPosition()
-    if self.mode == "split" and position.before and position.after then
+    if self:_displayedMode() == "split" then
         local gap = Size.padding.large
         local half = math.floor((self.width - 3 * gap) / 2)
         return CenterContainer:new{
@@ -346,7 +426,7 @@ function PreviewView:_content(height)
         }
     end
 
-    local bb = position[self.side] or position.after or position.before
+    local bb = position[self:_displayedSide()]
     if not bb then
         return self:_message(_("This page has not been rendered yet."), height)
     end
@@ -370,6 +450,7 @@ function PreviewView:_buttons()
 
     local position = self:_currentPosition()
     local both_sides = position.before ~= nil and position.after ~= nil
+    local displayed_side = self:_displayedSide()
 
     local view_row = {
         {
@@ -378,18 +459,33 @@ function PreviewView:_buttons()
             callback = function() self:onPreviousPage() end,
         },
     }
-    if self.mode == "flip" then
+    if self:_displayedMode() == "flip" then
         view_row[#view_row + 1] = {
-            text = self.side == "after" and _("Show before") or _("Show after"),
-            enabled = both_sides,
-            callback = function() self:onFlip() end,
+            text = displayed_side == "after" and _("Show before") or _("Show after"),
+            -- On a page the batch drew once, this draws the other half first.
+            enabled = not self.fetching_before
+                and (both_sides or (position.after ~= nil and self.batch_done)),
+            callback = function()
+                if self:_currentPosition().before then
+                    self:onFlip()
+                else
+                    self:_fetchBefore()
+                end
+            end,
         }
         view_row[#view_row + 1] = {
             text = _("Side by side"),
-            enabled = both_sides,
+            -- Same as the flip: on a page drawn only with the candidate style,
+            -- this draws the other half first rather than being unavailable.
+            enabled = not self.fetching_before
+                and (both_sides or (position.after ~= nil and self.batch_done)),
             callback = function()
-                self.mode = "split"
-                self:_rebuild()
+                if self:_currentPosition().before then
+                    self.mode = "split"
+                    self:_rebuild()
+                else
+                    self:_fetchBefore("split")
+                end
             end,
         }
     else
@@ -423,6 +519,41 @@ function PreviewView:_buttons()
     }
 
     return { view_row, decide_row }
+end
+
+--- self.side and self.mode are what the reader asked to see and are left alone
+-- by everything below; these two say what can be shown at this moment.
+--
+-- The difference matters on a page the batch drew only once. Turning a page
+-- while looking at "before" used to quietly put the view back to "after" — the
+-- new page's candidate render, labelled as though nothing had changed, which is
+-- the one thing a comparison must never do. Now the intent survives the turn:
+-- the missing image is drawn (see _ensureWantedView), and until it arrives the
+-- label says what the pixels are.
+function PreviewView:_displayedSide()
+    local position = self:_currentPosition()
+    if position[self.side] then return self.side end
+    return position.after and "after" or "before"
+end
+
+function PreviewView:_displayedMode()
+    local position = self:_currentPosition()
+    if self.mode == "split" and not (position.before and position.after) then
+        return "flip"
+    end
+    return self.mode
+end
+
+--- Carries the reader's view across a page turn: if they were looking at
+-- "before", or at both halves, the page they turned to needs its "before"
+-- image drawn as well.
+-- Returns true when it started one, which also means a repaint is coming.
+function PreviewView:_ensureWantedView()
+    if self.closing or self.fetching_before or not self.batch_done then return false end
+    if self.side ~= "before" and self.mode ~= "split" then return false end
+    local position = self:_currentPosition()
+    if not position.after or position.before then return false end
+    return self:_fetchBefore(self.mode == "split" and "split" or nil) == true
 end
 
 function PreviewView:_rebuild()
@@ -509,9 +640,13 @@ function PreviewView:_rebuild()
     }
 
     if self.shown then
-        -- Two page images swapping in place: a partial refresh would leave the
-        -- old text ghosted over the new.
-        UIManager:setDirty(self, "full")
+        -- A full refresh is for swapping one page image for another, where a
+        -- partial one would leave the old text ghosted over the new. The
+        -- loading and error screens are text on white and need no such thing —
+        -- and a full refresh there is not free: it is half a second in which
+        -- this process is not draining the subprocess pipe, which is half a
+        -- second of the subprocess sitting blocked waiting for it.
+        UIManager:setDirty(self, self.state == "ready" and "full" or "ui")
     end
 end
 
@@ -533,7 +668,12 @@ function PreviewView:_turn(delta)
     local target_index = self.index + delta
     if self.positions[target_index] then
         self.index = target_index
-        self:_rebuild()
+        -- When the page turned to still needs its "before" image, the repaint
+        -- waits for it: one refresh showing what was asked for beats two, the
+        -- first of them showing something else.
+        if not self:_ensureWantedView() then
+            self:_rebuild()
+        end
         return true
     end
 
@@ -622,12 +762,22 @@ end
 function PreviewView:onFlip()
     if self.state ~= "ready" then return true end
     local position = self:_currentPosition()
-    if not (position.before and position.after) then return true end
-    if self.mode == "split" then
+    if self:_displayedMode() == "split" then
         self.mode = "flip"
-    else
-        self.side = self.side == "after" and "before" or "after"
+        self:_rebuild()
+        return true
     end
+    if self:_displayedSide() == "after" then
+        self.side = "before"
+        if position.before then
+            self:_rebuild()
+        elseif position.after and self.batch_done then
+            -- Nothing to flip to yet on this page: draw it, then flip.
+            self:_fetchBefore()
+        end
+        return true
+    end
+    self.side = "after"
     self:_rebuild()
     return true
 end
@@ -648,7 +798,7 @@ end
 
 function PreviewView:onTap(_arg, ges)
     if self.state ~= "ready" then return true end
-    if self.mode == "split" and ges and ges.pos then
+    if self:_displayedMode() == "split" and ges and ges.pos then
         -- Tapping a half brings that half up to full size, which is where the
         -- typography is actually readable.
         self.side = ges.pos.x < self.width / 2 and "before" or "after"
@@ -713,6 +863,7 @@ function PreviewView:onCloseWidget()
         self.session:freeImages()
         self.session = nil
     end
+    self:_dropFetchedBefore()
     self.positions = {}
     UIManager:setDirty(nil, "full")
 end
